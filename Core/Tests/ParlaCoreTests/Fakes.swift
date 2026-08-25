@@ -68,3 +68,20 @@ struct FakeTranscriber: Transcriber {
     func start() async throws {}
     func stop() async {}
 }
+
+/// Emite unos eventos y **deja el stream abierto**, que es lo que pasa de verdad
+/// cuando dejas de hablar pero la escucha sigue encendida.
+struct OpenEndedTranscriber: Transcriber {
+    let script: [(TranscriptEvent, Date)]
+
+    var events: AsyncStream<(TranscriptEvent, Date)> {
+        let captured = script
+        return AsyncStream { continuation in
+            for item in captured { continuation.yield(item) }
+            // deliberadamente sin finish(): el micrófono sigue abierto
+        }
+    }
+
+    func start() async throws {}
+    func stop() async {}
+}

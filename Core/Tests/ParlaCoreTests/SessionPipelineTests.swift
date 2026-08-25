@@ -17,7 +17,8 @@ private let card = Card(english: "I need you to let me know.",
         (.final("y ya está"),              t0.addingTimeInterval(5.0)),
     ])
     let pipeline = SessionPipeline(transcriber: transcriber,
-                                   explainer: FakeExplainer(result: .success(card)))
+                                   explainer: FakeExplainer(result: .success(card)),
+                                   tickInterval: nil)
 
     var cards: [(Utterance, Card)] = []
     for await output in pipeline.outputs {
@@ -39,7 +40,8 @@ private let card = Card(english: "I need you to let me know.",
         (.partial("necesito"), t0.addingTimeInterval(0.1)),
     ])
     let pipeline = SessionPipeline(transcriber: transcriber,
-                                   explainer: FakeExplainer(result: .success(nil)))
+                                   explainer: FakeExplainer(result: .success(nil)),
+                                   tickInterval: nil)
 
     var partials: [String] = []
     for await output in pipeline.outputs {
@@ -54,7 +56,8 @@ private let card = Card(english: "I need you to let me know.",
         (.final("cierre"), t0.addingTimeInterval(5.0)),
     ])
     let pipeline = SessionPipeline(transcriber: transcriber,
-                                   explainer: FakeExplainer(result: .success(nil)))
+                                   explainer: FakeExplainer(result: .success(nil)),
+                                   tickInterval: nil)
 
     var cards = 0
     for await output in pipeline.outputs {
@@ -70,7 +73,8 @@ private let card = Card(english: "I need you to let me know.",
     ])
     let pipeline = SessionPipeline(
         transcriber: transcriber,
-        explainer: FakeExplainer(result: .failure(.rateLimited)))
+        explainer: FakeExplainer(result: .failure(.rateLimited)),
+        tickInterval: nil)
 
     var failures: [(Utterance, ExplainerError)] = []
     for await output in pipeline.outputs {
@@ -79,4 +83,21 @@ private let card = Card(english: "I need you to let me know.",
     #expect(failures.count == 2)
     #expect(failures.contains { $0.0.text == "hola mundo" })
     #expect(failures.allSatisfy { $0.1 == .rateLimited })
+}
+
+@Test func cierraLaFrasePorSilencioAunqueNoLleguenMasEventos() async throws {
+    // Hablas una frase y te callas. Nadie manda más eventos. La tarjeta tiene
+    // que salir igual: el silencio se mide con un reloj, no con el evento siguiente.
+    let transcriber = OpenEndedTranscriber(script: [(.final("hola qué tal"), Date())])
+    let pipeline = SessionPipeline(
+        transcriber: transcriber,
+        explainer: FakeExplainer(result: .success(card)),
+        segmenterConfig: .init(silenceGap: 0.2),
+        tickInterval: .milliseconds(50))
+
+    var got: Utterance?
+    for await output in pipeline.outputs {
+        if case .card(let u, _) = output { got = u; break }
+    }
+    #expect(got?.text == "hola qué tal")
 }
