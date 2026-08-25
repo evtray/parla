@@ -1,19 +1,31 @@
 import AppKit
 import Foundation
 import Observation
+import SwiftData
 import ParlaCore
 
 @MainActor
 @Observable
 final class AppState {
+
     private(set) var isListening = false
     private(set) var partialText = ""
     private(set) var setupError: String?
     private(set) var needsMicrophoneAccess = false
     private(set) var downloadProgress: Double?
+    private(set) var cards: [CardPresentation] = []
+
+    /// Las tres más recientes, ordenadas por cuándo se dijo la frase y no por
+    /// cuándo llegó la respuesta: las llamadas se resuelven desordenadas.
+    var visibleCards: [CardPresentation] {
+        Array(cards.sorted { $0.utterance.startedAt < $1.utterance.startedAt }.suffix(3))
+    }
+
+    var store: CardStore?
 
     private var engine: SpeechTranscriberEngine?
-    private var listener: Task<Void, Never>?
+    private var pipelineTask: Task<Void, Never>?
+    private var panel: FloatingPanel?
 
     func toggleListening() {
         isListening ? stop() : start()
@@ -27,12 +39,20 @@ final class AppState {
     }
 
     private func start() {
+        guard let apiKey = KeychainStore.shared.apiKey else {
+            setupError = ExplainerError.missingAPIKey.readableMessage
+            showPanel()
+            return
+        }
         isListening = true
         setupError = nil
+        showPanel()
+
         let engine = SpeechTranscriberEngine()
         self.engine = engine
+        let explainer = ClaudeExplainer(apiKey: apiKey)
 
-        listener = Task {
+        pipelineTask = Task {
             let phaseWatcher = Task { [weak self] in
                 while !Task.isCancelled {
                     if case .downloadingModel(let fraction) = engine.phase {
@@ -63,10 +83,18 @@ final class AppState {
                 return
             }
 
-            for await (event, _) in engine.events {
-                switch event {
-                case .partial(let text), .final(let text):
-                    if !text.isEmpty { partialText = text }
+            let pipeline = SessionPipeline(transcriber: engine, explainer: explainer)
+            for await output in pipeline.outputs {
+                switch output {
+                case .partial(let text):
+                    partialText = text
+                case .card(let utterance, let card):
+                    partialText = ""
+                    upsert(utterance, .ready(card))
+                    await store?.save(utterance: utterance, card: card)
+                case .failure(let utterance, let error):
+                    partialText = ""
+                    upsert(utterance, .failed(error))
                 }
             }
         }
@@ -74,11 +102,48 @@ final class AppState {
 
     private func stop() {
         isListening = false
+        partialText = ""
         downloadProgress = nil
-        listener?.cancel()
-        listener = nil
+        pipelineTask?.cancel()
+        pipelineTask = nil
         let engine = self.engine
         self.engine = nil
         Task { await engine?.stop() }
+        panel?.orderOut(nil)
+        panel = nil
+    }
+
+    private func upsert(_ utterance: Utterance, _ state: CardState) {
+        if let existing = cards.first(where: { $0.id == utterance.id }) {
+            existing.state = state
+        } else {
+            cards.append(CardPresentation(utterance: utterance, state: state))
+        }
+        if cards.count > 30 { cards.removeFirst(cards.count - 30) }
+    }
+
+    func retry(_ presentation: CardPresentation) {
+        guard let apiKey = KeychainStore.shared.apiKey else { return }
+        presentation.state = .pending
+        let explainer = ClaudeExplainer(apiKey: apiKey)
+        Task {
+            do {
+                if let card = try await explainer.explain(presentation.utterance) {
+                    presentation.state = .ready(card)
+                    await store?.save(utterance: presentation.utterance, card: card)
+                }
+            } catch let error as ExplainerError {
+                presentation.state = .failed(error)
+            } catch {
+                presentation.state = .failed(.network(error.localizedDescription))
+            }
+        }
+    }
+
+    private func showPanel() {
+        guard panel == nil else { return }
+        let panel = FloatingPanel { PanelView(state: self) }
+        panel.orderFrontRegardless()
+        self.panel = panel
     }
 }

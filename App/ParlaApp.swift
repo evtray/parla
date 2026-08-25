@@ -1,9 +1,18 @@
 import SwiftUI
+import SwiftData
 import KeyboardShortcuts
 
 @main
 struct ParlaApp: App {
     @State private var state = AppState()
+
+    private let container: ModelContainer = {
+        do {
+            return try ModelContainer(for: StoredCard.self)
+        } catch {
+            fatalError("No se pudo abrir la base de datos local: \(error)")
+        }
+    }()
 
     init() {
         // El atajo solo existe mientras la app corre: es un hotkey global
@@ -22,37 +31,33 @@ struct ParlaApp: App {
 
     var body: some Scene {
         MenuBarExtra {
-            MenuBarView(state: state)
+            MenuBarView(state: state, container: container)
+                .task { state.store = state.store ?? CardStore(modelContainer: container) }
         } label: {
             Image(systemName: state.isListening ? "mic.fill" : "mic")
         }
 
-        Settings {
-            SettingsView()
-        }
+        Settings { SettingsView() }
+
+        Window("Historial", id: "history") { HistoryView() }
+            .modelContainer(container)
     }
 }
 
 struct MenuBarView: View {
     @Bindable var state: AppState
+    let container: ModelContainer
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        if let progress = state.downloadProgress {
-            Text("Descargando modelo de español… \(Int(progress * 100))%")
-                .font(.caption)
-        }
-        if !state.partialText.isEmpty {
-            Text(state.partialText).font(.caption)
-        }
         if let error = state.setupError {
             Text(error).font(.caption).foregroundStyle(.red)
-        }
-        if state.needsMicrophoneAccess {
-            Button("Abrir Ajustes del Sistema") { AppState.openMicrophoneSettings() }
         }
         Button(state.isListening ? "Detener escucha" : "Empezar a escuchar") {
             state.toggleListening()
         }
+        Divider()
+        Button("Historial…") { openWindow(id: "history") }
         SettingsLink { Text("Ajustes…") }
         Divider()
         Button("Salir") { NSApplication.shared.terminate(nil) }

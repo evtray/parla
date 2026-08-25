@@ -47,3 +47,8 @@ targets:
       - path: AppTests
     dependencies:
       - target: Parla
+    settings:
+      base:
+        # Sin esto el target no firma: "does not have an Info.plist file".
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_VERSION: "6.0"
