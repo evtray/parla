@@ -13,15 +13,19 @@ public struct ClaudeRequestBuilder: Sendable {
     private static let endpoint = URL(string: "https://api.anthropic.com/v1/messages")!
 
     /// El esquema que la API fuerza sobre la respuesta. Coincide con `Card`.
+    ///
+    /// Sin `minItems`/`maxItems`: la salida estructurada admite solo un
+    /// subconjunto de JSON Schema y los rechaza con
+    /// "for 'array' type, property maxItems is not supported". Los límites de
+    /// longitud se imponen desde el system prompt, no desde el esquema.
     private var outputSchema: [String: Any] {
         [
             "type": "object",
             "properties": [
                 "english": ["type": "string"],
-                "why": ["type": "array", "items": ["type": "string"],
-                        "minItems": 1, "maxItems": 3],
+                "why": ["type": "array", "items": ["type": "string"]],
                 "vocab": [
-                    "type": "array", "maxItems": 3,
+                    "type": "array",
                     "items": [
                         "type": "object",
                         "properties": [

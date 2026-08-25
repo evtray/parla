@@ -72,3 +72,13 @@ private let utterance = Utterance(text: "necesito que me avises cuando llegues",
         try ClaudeRequestBuilder().makeRequest(for: utterance, apiKey: "")
     }
 }
+
+@Test func noUsaPalabrasClaveQueLaAPIRechaza() throws {
+    // La API responde 400 con "for 'array' type, property maxItems is not
+    // supported": los esquemas de salida admiten solo un subconjunto de JSON
+    // Schema. Los límites de longitud se imponen desde el system prompt.
+    let request = try ClaudeRequestBuilder().makeRequest(for: utterance, apiKey: "k")
+    let raw = String(data: try #require(request.httpBody), encoding: .utf8) ?? ""
+    #expect(!raw.contains("maxItems"))
+    #expect(!raw.contains("minItems"))
+}
