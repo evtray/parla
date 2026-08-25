@@ -10,6 +10,10 @@ struct ParlaApp: App {
         } label: {
             Image(systemName: state.isListening ? "mic.fill" : "mic")
         }
+
+        Settings {
+            SettingsView()
+        }
     }
 }
 
@@ -20,6 +24,7 @@ struct MenuBarView: View {
         Button(state.isListening ? "Detener escucha" : "Empezar a escuchar") {
             state.toggleListening()
         }
+        SettingsLink { Text("Ajustes…") }
         Divider()
         Button("Salir") { NSApplication.shared.terminate(nil) }
     }
