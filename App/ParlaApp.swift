@@ -1,8 +1,18 @@
 import SwiftUI
+import KeyboardShortcuts
 
 @main
 struct ParlaApp: App {
     @State private var state = AppState()
+
+    init() {
+        // El atajo solo existe mientras la app corre: es un hotkey global
+        // registrado por el proceso, no un lanzador.
+        let state = self.state
+        KeyboardShortcuts.onKeyUp(for: .toggleListening) {
+            Task { @MainActor in state.toggleListening() }
+        }
+    }
 
     var body: some Scene {
         MenuBarExtra {
