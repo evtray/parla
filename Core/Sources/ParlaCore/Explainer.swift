@@ -5,7 +5,8 @@ public enum ExplainerError: Error, Equatable, Sendable {
     case missingAPIKey
     /// 429. Mensaje distinto al de red: no ofrecer reintento inmediato.
     case rateLimited
-    case server(status: Int)
+    /// El mensaje viene del cuerpo de la respuesta: sin él, un 400 es indepurable.
+    case server(status: Int, message: String?)
     /// La cadena de fallback también declinó la frase.
     case refused
     /// El stream terminó sin JSON válido.

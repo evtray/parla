@@ -36,6 +36,11 @@ final class SpeechTranscriberEngine: Transcriber {
     /// Fase de arranque, para que la UI pueda mostrar descarga o error.
     private(set) var phase: TranscriberPhase = .idle
 
+    /// `false` cuando el dispositivo de entrada acepta el tap pero no entrega
+    /// audio — el caso típico es un headset Bluetooth en modo A2DP.
+    var isReceivingAudio: Bool { audio?.isReceivingAudio ?? false }
+    var inputDeviceName: String { audio?.inputDeviceName ?? "el micrófono" }
+
     init(locale: Locale = Locale(identifier: "es-419")) {
         self.requestedLocale = locale
         (self.events, self.relay) = AsyncStream.makeStream()
@@ -47,6 +52,7 @@ final class SpeechTranscriberEngine: Transcriber {
             throw TranscriberSetupError.microphoneDenied
         }
         let locale = try await resolvedLocale()
+        Log.speech.info("locale resuelto: \(locale.identifier)")
         let transcriber = SpeechTranscriber(locale: locale, preset: .progressiveTranscription)
         try await ensureAssets(for: transcriber)
         _ = try? await AssetInventory.reserve(locale: locale)
@@ -54,6 +60,7 @@ final class SpeechTranscriberEngine: Transcriber {
         guard let format = await SpeechAnalyzer.bestAvailableAudioFormat(
             compatibleWith: [transcriber]
         ) else { throw TranscriberSetupError.assetUnavailable }
+        Log.speech.info("formato del analizador: \(format.sampleRate) Hz, \(format.channelCount) canal(es)")
 
         let capture = AudioCapture()
         let chunks = try capture.start(outputFormat: format)
@@ -66,15 +73,19 @@ final class SpeechTranscriberEngine: Transcriber {
         self.analyzer = analyzer
         self.audio = capture
         phase = .ready
+        Log.speech.info("analizador arrancado")
 
         pump = Task { [weak self] in
             guard let self else { return }
             do {
                 for try await result in transcriber.results {
                     let text = String(result.text.characters)
+                    Log.speech.info("resultado \(result.isFinal ? "final" : "parcial"): \(text)")
                     self.emit(result.isFinal ? .final(text) : .partial(text))
                 }
+                Log.speech.info("el stream de resultados terminó")
             } catch {
+                Log.speech.error("el stream de resultados falló: \(String(describing: error))")
                 self.emit(.final(""))   // cierra lo pendiente
             }
         }
@@ -118,7 +129,9 @@ final class SpeechTranscriberEngine: Transcriber {
 
     /// Descarga el modelo de español si no está instalado.
     private func ensureAssets(for module: SpeechTranscriber) async throws {
-        switch await AssetInventory.status(forModules: [module]) {
+        let status = await AssetInventory.status(forModules: [module])
+        Log.speech.info("estado del modelo: \(String(describing: status))")
+        switch status {
         case .installed:
             return
         case .unsupported:

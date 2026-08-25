@@ -28,6 +28,13 @@ struct PanelView: View {
                     }
                 }
 
+                if let warning = state.silentInputWarning {
+                    Label(warning, systemImage: "exclamationmark.triangle.fill")
+                        .font(.callout)
+                        .foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
                 if let error = state.setupError {
                     Text(error).font(.callout).foregroundStyle(.red)
                 }

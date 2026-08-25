@@ -34,7 +34,7 @@ private func explainer(_ streamer: any HTTPStreamer, apiKey: String = "sk-test")
     await #expect(throws: ExplainerError.rateLimited) {
         try await explainer(FakeStreamer(statusCode: 429)).explain(utterance)
     }
-    await #expect(throws: ExplainerError.server(status: 503)) {
+    await #expect(throws: ExplainerError.server(status: 503, message: "")) {
         try await explainer(FakeStreamer(statusCode: 503)).explain(utterance)
     }
 }
@@ -59,5 +59,14 @@ private func explainer(_ streamer: any HTTPStreamer, apiKey: String = "sk-test")
 @Test func exigeApiKeyAntesDeTocarLaRed() async {
     await #expect(throws: ExplainerError.missingAPIKey) {
         try await explainer(FakeStreamer(lines: []), apiKey: "").explain(utterance)
+    }
+}
+
+
+@Test func conservaElMensajeDeErrorDeLaAPI() async {
+    // Un 400 sin mensaje es indepurable: el motivo tiene que llegar al usuario.
+    let body = #"{"type":"error","error":{"type":"invalid_request_error","message":"minItems no admitido"}}"#
+    await #expect(throws: ExplainerError.server(status: 400, message: "minItems no admitido")) {
+        try await explainer(FakeStreamer(statusCode: 400, lines: [body])).explain(utterance)
     }
 }

@@ -17,6 +17,21 @@ final class AudioCapture {
     /// Nivel RMS 0…1 para el indicador de "te estoy oyendo".
     private(set) var level: Float = 0
 
+    /// Cuándo llegó el último buffer. Un dispositivo Bluetooth en modo A2DP
+    /// acepta el tap y no entrega nada: sin esto, el fallo es invisible.
+    private(set) var lastBufferAt: Date?
+
+    /// Nombre del dispositivo de entrada, para poder decir cuál está mudo.
+    var inputDeviceName: String {
+        AVCaptureDevice.default(for: .audio)?.localizedName ?? "el micrófono"
+    }
+
+    /// `false` si el motor lleva más de 3 s sin recibir audio.
+    var isReceivingAudio: Bool {
+        guard let lastBufferAt else { return false }
+        return Date().timeIntervalSince(lastBufferAt) < 3
+    }
+
     private let engine = AVAudioEngine()
     private var continuation: AsyncStream<AudioChunk>.Continuation?
     private var converter: AVAudioConverter?
@@ -54,6 +69,7 @@ final class AudioCapture {
         continuation = nil
         converter = nil
         level = 0
+        lastBufferAt = nil
     }
 
     /// El tap y el motor son estados independientes: un cambio de configuración
@@ -84,11 +100,17 @@ final class AudioCapture {
             if let converted = Self.convert(buffer, to: outputFormat, using: converter) {
                 continuation?.yield(AudioChunk(buffer: converted))
             }
-            Task { @MainActor in self?.level = rms }
+            Task { @MainActor in
+                self?.level = rms
+                self?.lastBufferAt = Date()
+            }
+            AudioCapture.reportLevel(rms)
         }
         input.installTap(onBus: 0, bufferSize: 4096, format: inputFormat, block: tap)
         engine.prepare()
         try engine.start()
+        Log.audio.info("tap instalado; entrada \(inputFormat.sampleRate) Hz "
+            + "\(inputFormat.channelCount)ch; motor corriendo: \(engine.isRunning)")
     }
 
     /// Puras y sin estado: corren en el hilo de audio, nunca en el principal.
@@ -115,6 +137,13 @@ final class AudioCapture {
         return error == nil && output.frameLength > 0 ? output : nil
     }
 
+    /// Un resumen cada ~5 s: sirve para distinguir "no te oigo" de "no entiendo".
+    private nonisolated static let levelReporter = LevelReporter()
+
+    private nonisolated static func reportLevel(_ rms: Float) {
+        levelReporter.record(rms)
+    }
+
     private nonisolated static func rms(of buffer: AVAudioPCMBuffer) -> Float {
         guard let channel = buffer.floatChannelData?[0] else { return 0 }
         let count = Int(buffer.frameLength)
@@ -122,5 +151,25 @@ final class AudioCapture {
         var sum: Float = 0
         for i in 0..<count { sum += channel[i] * channel[i] }
         return min(1, (sum / Float(count)).squareRoot() * 8)
+    }
+}
+
+/// Acumula el nivel de entrada y lo registra periódicamente, sin inundar el log.
+final class LevelReporter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var peak: Float = 0
+    private var buffers = 0
+    private var lastReport = Date()
+
+    func record(_ rms: Float) {
+        lock.lock()
+        peak = max(peak, rms)
+        buffers += 1
+        let now = Date()
+        guard now.timeIntervalSince(lastReport) >= 5 else { lock.unlock(); return }
+        let (p, n) = (peak, buffers)
+        peak = 0; buffers = 0; lastReport = now
+        lock.unlock()
+        Log.audio.info("entrada: \(n) buffers en 5s, pico \(String(format: "%.3f", p))")
     }
 }

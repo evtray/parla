@@ -29,7 +29,8 @@ extension ExplainerError {
         switch self {
         case .missingAPIKey: "Falta tu clave de la API. Ábrela en Ajustes."
         case .rateLimited:   "Vas muy rápido para la API. Espera unos segundos."
-        case .server(let s): "El servidor respondió \(s). Puedes reintentar."
+        case .server(let s, let m):
+            m.map { "Error \(s): \($0)" } ?? "El servidor respondió \(s). Puedes reintentar."
         case .refused:       "No se pudo traducir esta frase."
         case .malformedResponse: "La respuesta llegó incompleta. Puedes reintentar."
         case .network(let m): "Sin conexión: \(m)"

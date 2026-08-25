@@ -14,6 +14,15 @@ public struct ClaudeExplainer: Explainer {
         self.apiKey = apiKey
     }
 
+    /// Extrae `error.message` del JSON de error de la API.
+    private static func apiMessage(from body: String) -> String? {
+        guard let data = body.data(using: .utf8),
+              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let error = root["error"] as? [String: Any]
+        else { return nil }
+        return error["message"] as? String
+    }
+
     public func explain(_ utterance: Utterance) async throws -> Card? {
         let request = try builder.makeRequest(for: utterance, apiKey: apiKey)
 
@@ -27,9 +36,16 @@ public struct ClaudeExplainer: Explainer {
         }
 
         switch response.statusCode {
-        case 200: break
-        case 429: throw ExplainerError.rateLimited
-        default: throw ExplainerError.server(status: response.statusCode)
+        case 200:
+            break
+        case 429:
+            throw ExplainerError.rateLimited
+        default:
+            // El cuerpo de un error no es SSE: es un JSON de una pieza.
+            var body = ""
+            for try await line in response.lines { body += line }
+            throw ExplainerError.server(status: response.statusCode,
+                                        message: Self.apiMessage(from: body) ?? body)
         }
 
         var parser = SSEParser()

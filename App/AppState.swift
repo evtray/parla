@@ -13,6 +13,8 @@ final class AppState {
     private(set) var setupError: String?
     private(set) var needsMicrophoneAccess = false
     private(set) var downloadProgress: Double?
+    /// Mensaje visible cuando el dispositivo de entrada no entrega audio.
+    private(set) var silentInputWarning: String?
     private(set) var cards: [CardPresentation] = []
 
     /// Las tres más recientes, ordenadas por cuándo se dijo la frase y no por
@@ -63,6 +65,15 @@ final class AppState {
                     } else {
                         self?.downloadProgress = nil
                     }
+                    if engine.phase == .ready, !engine.isReceivingAudio {
+                        self?.silentInputWarning =
+                            "No llega audio desde \(engine.inputDeviceName). "
+                            + "Si es un auricular Bluetooth, macOS puede tenerlo en "
+                            + "modo solo salida: elige otra entrada en Ajustes del "
+                            + "Sistema › Sonido."
+                    } else {
+                        self?.silentInputWarning = nil
+                    }
                     try? await Task.sleep(for: .milliseconds(300))
                 }
             }
@@ -90,12 +101,15 @@ final class AppState {
             for await output in pipeline.outputs {
                 switch output {
                 case .partial(let text):
+                    Log.pipeline.info("parcial: \(text)")
                     partialText = text
                 case .card(let utterance, let card):
+                    Log.pipeline.info("tarjeta lista para: \(utterance.text)")
                     partialText = ""
                     upsert(utterance, .ready(card))
                     await store.save(utterance: utterance, card: card)
                 case .failure(let utterance, let error):
+                    Log.pipeline.error("fallo en «\(utterance.text)»: \(error.readableMessage)")
                     partialText = ""
                     upsert(utterance, .failed(error))
                 }
@@ -107,6 +121,7 @@ final class AppState {
         isListening = false
         partialText = ""
         downloadProgress = nil
+        silentInputWarning = nil
         pipelineTask?.cancel()
         pipelineTask = nil
         let engine = self.engine
