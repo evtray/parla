@@ -12,6 +12,12 @@ struct ParlaApp: App {
         KeyboardShortcuts.onKeyUp(for: .toggleListening) {
             Task { @MainActor in state.toggleListening() }
         }
+
+        // Afordancia de desarrollo: PARLA_AUTOSTART=1 enciende la escucha al
+        // arrancar, para poder probar el pipeline desde la terminal sin clicar.
+        if ProcessInfo.processInfo.environment["PARLA_AUTOSTART"] == "1" {
+            Task { @MainActor in state.toggleListening() }
+        }
     }
 
     var body: some Scene {

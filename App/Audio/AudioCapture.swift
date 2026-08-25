@@ -49,39 +49,50 @@ final class AudioCapture {
             NotificationCenter.default.removeObserver(observer)
             self.observer = nil
         }
-        if engine.isRunning {
-            engine.inputNode.removeTap(onBus: 0)
-            engine.stop()
-        }
+        removeTapAndStop()
         continuation?.finish()
         continuation = nil
         converter = nil
         level = 0
     }
 
+    /// El tap y el motor son estados independientes: un cambio de configuración
+    /// de audio detiene el motor pero deja el tap instalado. Condicionar la
+    /// retirada a `isRunning` dejaba el tap vivo, y la reinstalación abortaba el
+    /// proceso con 'required condition is false: nullptr == Tap()'.
+    /// `removeTap` sobre un bus sin tap es inocuo, así que se llama siempre.
+    private func removeTapAndStop() {
+        engine.inputNode.removeTap(onBus: 0)
+        if engine.isRunning { engine.stop() }
+    }
+
     private func installTap(outputFormat: AVAudioFormat) throws {
-        if engine.isRunning {
-            engine.inputNode.removeTap(onBus: 0)
-            engine.stop()
-        }
+        removeTapAndStop()
         let input = engine.inputNode
         let inputFormat = input.outputFormat(forBus: 0)
         let converter = AVAudioConverter(from: inputFormat, to: outputFormat)
         self.converter = converter
 
         let continuation = self.continuation
-        input.installTap(onBus: 0, bufferSize: 4096, format: inputFormat) { buffer, _ in
+
+        // CoreAudio invoca este bloque desde su hilo de tiempo real. Tiene que
+        // ser @Sendable de forma explícita: si hereda el aislamiento @MainActor
+        // de la clase, el runtime de Swift comprueba el executor en cada buffer,
+        // ve que no está en el hilo principal y aborta con SIGTRAP.
+        let tap: AVAudioNodeTapBlock = { @Sendable [weak self] buffer, _ in
             let rms = Self.rms(of: buffer)
-            Task { @MainActor [weak self] in self?.level = rms }
             if let converted = Self.convert(buffer, to: outputFormat, using: converter) {
                 continuation?.yield(AudioChunk(buffer: converted))
             }
+            Task { @MainActor in self?.level = rms }
         }
+        input.installTap(onBus: 0, bufferSize: 4096, format: inputFormat, block: tap)
         engine.prepare()
         try engine.start()
     }
 
-    private static func convert(_ buffer: AVAudioPCMBuffer,
+    /// Puras y sin estado: corren en el hilo de audio, nunca en el principal.
+    private nonisolated static func convert(_ buffer: AVAudioPCMBuffer,
                                 to format: AVAudioFormat,
                                 using converter: AVAudioConverter?) -> AVAudioPCMBuffer? {
         guard let converter else { return nil }
@@ -104,7 +115,7 @@ final class AudioCapture {
         return error == nil && output.frameLength > 0 ? output : nil
     }
 
-    private static func rms(of buffer: AVAudioPCMBuffer) -> Float {
+    private nonisolated static func rms(of buffer: AVAudioPCMBuffer) -> Float {
         guard let channel = buffer.floatChannelData?[0] else { return 0 }
         let count = Int(buffer.frameLength)
         guard count > 0 else { return 0 }
