@@ -52,3 +52,19 @@ func sseLines(forJSON json: String, stopReason: String = "end_turn") -> [String]
         #"data: {"type":"message_stop"}"#,
     ]
 }
+
+/// Reproduce un guion de eventos con horas fijas. No duerme: el tiempo es un dato.
+struct FakeTranscriber: Transcriber {
+    let script: [(TranscriptEvent, Date)]
+
+    var events: AsyncStream<(TranscriptEvent, Date)> {
+        let captured = script
+        return AsyncStream { continuation in
+            for item in captured { continuation.yield(item) }
+            continuation.finish()
+        }
+    }
+
+    func start() async throws {}
+    func stop() async {}
+}
