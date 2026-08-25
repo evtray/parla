@@ -31,6 +31,19 @@ struct MenuBarView: View {
     @Bindable var state: AppState
 
     var body: some View {
+        if let progress = state.downloadProgress {
+            Text("Descargando modelo de español… \(Int(progress * 100))%")
+                .font(.caption)
+        }
+        if !state.partialText.isEmpty {
+            Text(state.partialText).font(.caption)
+        }
+        if let error = state.setupError {
+            Text(error).font(.caption).foregroundStyle(.red)
+        }
+        if state.needsMicrophoneAccess {
+            Button("Abrir Ajustes del Sistema") { AppState.openMicrophoneSettings() }
+        }
         Button(state.isListening ? "Detener escucha" : "Empezar a escuchar") {
             state.toggleListening()
         }
