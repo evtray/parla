@@ -9,7 +9,7 @@ TESTFLAGS := $(if $(wildcard $(XLIBS)/lib_TestingInterop.dylib), \
   -Xlinker -rpath -Xlinker $(XFRAMEWORKS) \
   -Xlinker -rpath -Xlinker $(XLIBS),)
 
-.PHONY: test generate build run open
+.PHONY: test generate build run install open
 
 test:
 	cd Core && swift test $(TESTFLAGS)
@@ -25,6 +25,15 @@ run: build
 	@pkill -f 'Parla.app/Contents/MacOS/Parla' 2>/dev/null || true
 	@open "$$(xcodebuild -project Parla.xcodeproj -scheme Parla -configuration Debug \
 	  -showBuildSettings 2>/dev/null | awk -F' = ' '/ BUILT_PRODUCTS_DIR/{print $$2}')/Parla.app"
+
+# Deja la app en /Applications para poder abrirla desde Spotlight.
+install: build
+	@pkill -f 'Parla.app/Contents/MacOS/Parla' 2>/dev/null || true
+	@rm -rf /Applications/Parla.app
+	@cp -R "$$(xcodebuild -project Parla.xcodeproj -scheme Parla -configuration Debug \
+	  -showBuildSettings 2>/dev/null | awk -F' = ' '/ BUILT_PRODUCTS_DIR/{print $$2}')/Parla.app" \
+	  /Applications/
+	@echo "Parla instalada en /Applications. Ábrela con Spotlight (⌘Espacio → Parla)."
 
 open: generate
 	open Parla.xcodeproj
