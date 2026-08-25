@@ -21,7 +21,10 @@ final class AppState {
         Array(cards.sorted { $0.utterance.startedAt < $1.utterance.startedAt }.suffix(3))
     }
 
-    var store: CardStore?
+    /// No opcional a propósito: un store ausente perdía tarjetas en silencio.
+    /// Nada de la UI depende de él, así que queda fuera de la observación.
+    @ObservationIgnored
+    private let store = CardStore(modelContainer: Persistence.container)
 
     private var engine: SpeechTranscriberEngine?
     private var pipelineTask: Task<Void, Never>?
@@ -91,7 +94,7 @@ final class AppState {
                 case .card(let utterance, let card):
                     partialText = ""
                     upsert(utterance, .ready(card))
-                    await store?.save(utterance: utterance, card: card)
+                    await store.save(utterance: utterance, card: card)
                 case .failure(let utterance, let error):
                     partialText = ""
                     upsert(utterance, .failed(error))
@@ -130,7 +133,7 @@ final class AppState {
             do {
                 if let card = try await explainer.explain(presentation.utterance) {
                     presentation.state = .ready(card)
-                    await store?.save(utterance: presentation.utterance, card: card)
+                    await store.save(utterance: presentation.utterance, card: card)
                 }
             } catch let error as ExplainerError {
                 presentation.state = .failed(error)

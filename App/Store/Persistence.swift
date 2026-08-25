@@ -1,0 +1,17 @@
+import Foundation
+import SwiftData
+
+/// Contenedor único de la app.
+///
+/// Vive aquí y no colgado de una vista: cuando `AppState.store` se asignaba
+/// desde un `.task` del menú de la barra, quedaba en `nil` y `store?.save(...)`
+/// se convertía en un no-op silencioso — la tarjeta se pintaba y se perdía.
+enum Persistence {
+    static let container: ModelContainer = {
+        do {
+            return try ModelContainer(for: StoredCard.self)
+        } catch {
+            fatalError("No se pudo abrir la base de datos local: \(error)")
+        }
+    }()
+}

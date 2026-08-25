@@ -6,14 +6,6 @@ import KeyboardShortcuts
 struct ParlaApp: App {
     @State private var state = AppState()
 
-    private let container: ModelContainer = {
-        do {
-            return try ModelContainer(for: StoredCard.self)
-        } catch {
-            fatalError("No se pudo abrir la base de datos local: \(error)")
-        }
-    }()
-
     init() {
         // El atajo solo existe mientras la app corre: es un hotkey global
         // registrado por el proceso, no un lanzador.
@@ -31,8 +23,7 @@ struct ParlaApp: App {
 
     var body: some Scene {
         MenuBarExtra {
-            MenuBarView(state: state, container: container)
-                .task { state.store = state.store ?? CardStore(modelContainer: container) }
+            MenuBarView(state: state)
         } label: {
             Image(systemName: state.isListening ? "mic.fill" : "mic")
         }
@@ -40,13 +31,12 @@ struct ParlaApp: App {
         Settings { SettingsView() }
 
         Window("Historial", id: "history") { HistoryView() }
-            .modelContainer(container)
+            .modelContainer(Persistence.container)
     }
 }
 
 struct MenuBarView: View {
     @Bindable var state: AppState
-    let container: ModelContainer
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
