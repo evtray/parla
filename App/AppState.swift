@@ -17,10 +17,16 @@ final class AppState {
     private(set) var silentInputWarning: String?
     private(set) var cards: [CardPresentation] = []
 
-    /// Las tres más recientes, ordenadas por cuándo se dijo la frase y no por
+    var visibleCards: [CardPresentation] { Self.mostRecent(cards) }
+
+    /// Las más recientes primero, ordenadas por cuándo se dijo la frase y no por
     /// cuándo llegó la respuesta: las llamadas se resuelven desordenadas.
-    var visibleCards: [CardPresentation] {
-        Array(cards.sorted { $0.utterance.startedAt < $1.utterance.startedAt }.suffix(3))
+    ///
+    /// La nueva entra arriba, pegada al texto en vivo, para no tener que buscar
+    /// con la vista dónde apareció.
+    static func mostRecent(_ cards: [CardPresentation],
+                           limit: Int = 3) -> [CardPresentation] {
+        Array(cards.sorted { $0.utterance.startedAt > $1.utterance.startedAt }.prefix(limit))
     }
 
     /// No opcional a propósito: un store ausente perdía tarjetas en silencio.
