@@ -1,0 +1,49 @@
+name: Parla
+options:
+  bundleIdPrefix: app.schoolaid
+  deploymentTarget:
+    macOS: "26.0"
+  createIntermediateGroups: true
+
+packages:
+  KeyboardShortcuts:
+    url: https://github.com/sindresorhus/KeyboardShortcuts
+    from: 3.0.1
+  ParlaCore:
+    path: Core
+
+targets:
+  Parla:
+    type: application
+    platform: macOS
+    sources:
+      - path: App
+    dependencies:
+      - package: KeyboardShortcuts
+      - package: ParlaCore
+        product: ParlaCore
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleName: Parla
+        CFBundleShortVersionString: "0.1.0"
+        CFBundleVersion: "1"
+        LSMinimumSystemVersion: "26.0"
+        # Sin icono en el Dock: la app vive en la barra de menú.
+        LSUIElement: true
+        NSMicrophoneUsageDescription: "Parla escucha tu voz para traducir al inglés lo que dices."
+        NSSpeechRecognitionUsageDescription: "Parla transcribe tu voz en tu Mac para poder traducirla."
+    settings:
+      base:
+        SWIFT_VERSION: "6.0"
+        CODE_SIGN_ENTITLEMENTS: App/Parla.entitlements
+        ENABLE_HARDENED_RUNTIME: YES
+        SWIFT_STRICT_CONCURRENCY: complete
+
+  ParlaTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: AppTests
+    dependencies:
+      - target: Parla
