@@ -3,3 +3,4 @@
 DerivedData/
 *.xcodeproj
 Parla.xcodeproj/
+dist/
