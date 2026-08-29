@@ -7,6 +7,7 @@ extension KeyboardShortcuts.Name {
 }
 
 struct SettingsView: View {
+    @Bindable var state: AppState
     @State private var apiKey = KeychainStore.shared.apiKey ?? ""
 
     var body: some View {
@@ -18,6 +19,19 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Button("Guardar") { KeychainStore.shared.apiKey = apiKey }
+            }
+            Section("Cuándo traducir") {
+                Picker("", selection: $state.mode) {
+                    ForEach(TranslationMode.allCases) { mode in
+                        Text(mode.label).tag(mode)
+                    }
+                }
+                .pickerStyle(.radioGroup)
+                .labelsHidden()
+                Text(state.mode.detail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Section("Atajo") {
                 KeyboardShortcuts.Recorder("Encender y apagar la escucha:",

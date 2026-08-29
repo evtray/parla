@@ -28,7 +28,7 @@ struct ParlaApp: App {
             Image(systemName: state.isListening ? "mic.fill" : "mic")
         }
 
-        Settings { SettingsView() }
+        Settings { SettingsView(state: state) }
 
         Window("Historial", id: "history") { HistoryView() }
             .modelContainer(Persistence.container)
@@ -45,6 +45,14 @@ struct MenuBarView: View {
         }
         Button(state.isListening ? "Detener escucha" : "Empezar a escuchar") {
             state.toggleListening()
+        }
+        if state.mode == .batch, !state.pending.isEmpty {
+            Button(state.pending.count == 1
+                   ? "Traducir 1 frase"
+                   : "Traducir \(state.pending.count) frases") {
+                state.sendBatch()
+            }
+            .disabled(state.isSendingBatch)
         }
         Divider()
         Button("Historial…") { openWindow(id: "history") }

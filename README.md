@@ -49,10 +49,28 @@ La escucha es una sesión que enciendes y apagas: no se queda escuchando de fond
 El panel muestra las tres frases más recientes, la nueva arriba; el resto pasa al
 historial, que es buscable.
 
+### Al vuelo o en lote
+
+En Ajustes › **Cuándo traducir** eliges entre dos formas de trabajar:
+
+- **Cada frase al vuelo.** La tarjeta sale unos segundos después de hablar. Una
+  petición a la API por frase.
+- **Acumular y traducir cuando yo lo pida.** Las frases se quedan en una cola y
+  no se manda nada hasta que pulsas «Traducir». Apagar la escucha tampoco manda
+  nada: la cola sobrevive.
+
+El lote no solo gasta menos. Como el modelo ve la sesión entera de una vez,
+añade un bloque de **patrones**: los errores que repites, con cuántas frases de
+cuántas, que es justo lo que no se ve mirando las tarjetas de una en una.
+
+Los lotes de más de 20 frases se parten en varias peticiones. Si una se cae, sus
+frases vuelven a la cola con el motivo a la vista y el botón de traducir hace de
+reintento; el resto del lote llega igual.
+
 ## Compilar
 
 ```bash
-make test      # 41 tests
+make test      # 51 tests
 make run       # compila y lanza
 make install   # deja la app en /Applications
 make release   # dist/Parla-X.Y.Z.zip
@@ -108,3 +126,7 @@ Sonido.
 `UtteranceSegmenter.Config.silenceGap` (0,9 s) decide cuándo termina una frase. Si
 te corta a la mitad, súbelo; si tarda en reaccionar, bájalo. Está en un solo sitio
 a propósito.
+
+`ClaudeRequestBuilder.chunkSize` (20) es cuántas frases caben en una petición de
+lote. Subirlo ahorra peticiones pero arriesga que la respuesta no quepa en
+`batchMaxTokens` y el modelo corte una tarjeta a la mitad.
