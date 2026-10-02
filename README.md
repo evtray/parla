@@ -1,7 +1,7 @@
 # Parla
 
-App de macOS que escucha lo que dices en español y muestra, en una ventana
-flotante sobre cualquier aplicación, cómo se diría en inglés **y por qué se dice
+App de macOS que escucha lo que dices en español, o lee lo que capturas de la
+pantalla, y muestra, en una ventana flotante sobre cualquier aplicación, cómo se diría en inglés **y por qué se dice
 así**.
 
 El objetivo no es traducir: es aprender. Cada tarjeta explica en qué se diferencia
@@ -29,9 +29,13 @@ tiempo verbal, orden de palabras.
 |---|---|
 | Transcripción de voz | **En tu Mac.** `SpeechAnalyzer` (macOS 26), sin conexión |
 | Traducción y explicación | API de Anthropic, con el modelo que elijas (Opus 5.5 por defecto) |
+| Lectura de capturas | API de Anthropic: la imagen de la región que seleccionas |
 | Historial | SQLite local vía SwiftData |
 
 **Tu audio nunca sale del equipo.** Solo viaja el texto transcrito.
+
+**Las capturas sí salen:** la imagen de la región que seleccionas viaja a la API.
+No se guarda en tu Mac; al historial va solo el texto que Claude leyó en ella.
 
 ## Requisitos
 
@@ -68,15 +72,43 @@ Los lotes de más de 20 frases se parten en varias peticiones. Si una se cae, su
 frases vuelven a la cola con el motivo a la vista y el botón de traducir hace de
 reintento; el resto del lote llega igual.
 
+### Capturar la pantalla
+
+Pulsa **⌃⌥C** (o «Capturar pantalla» en el menú de la barra) y arrastra un
+rectángulo sobre el texto, como con ⌘⇧4. Esc cancela sin gastar nada. Parla
+decide qué hacer con lo que ve:
+
+- **Español** → cómo se dice en inglés y por qué, igual que con la voz.
+- **Inglés que escribiste tú** (una caja de redacción, tus burbujas en un chat,
+  un correo que estás redactando) → la versión corregida y qué estaba mal.
+- **Inglés de otra persona** → qué significa y qué tiene de no evidente.
+
+Si se equivoca de caso, «¿No era eso?» en la tarjeta vuelve a mandar la misma
+imagen con el caso que elijas.
+
+La primera vez macOS pide el permiso de **Grabación de pantalla**. Después de
+darlo hay que cerrar Parla y volver a abrirla. Como cada compilación firmada ad
+hoc es una app nueva para macOS, tras cada `make install` hay que volver a darlo.
+
+La selección es una capa propia, no la de ⌘⇧4: dentro del sandbox,
+`screencapture -i` termina sin mostrar la cruz. La región se captura con
+ScreenCaptureKit.
+
 ## Compilar
 
 ```bash
-make test      # 51 tests de Core, sin abrir Xcode
-make test-app  # 15 tests del target de la app, alojados en Parla.app
+make test      # 73 tests de Core, sin abrir Xcode
+make test-app  # 38 tests del target de la app, alojados en Parla.app
+make eval-capture  # manda Core/Fixtures/capturas a la API y cuenta aciertos del caso
 make run       # compila y lanza
 make install   # deja la app en /Applications
 make release   # dist/Parla-X.Y.Z.zip
 ```
+
+`make eval-capture` necesita `PARLA_API_KEY` y gasta tokens: unas 8 peticiones.
+Para añadir una captura real, guárdala en `Core/Fixtures/capturas/` con el caso
+esperado al principio del nombre (`correct-09-mi-correo.png`). Las de muestra se
+regeneran desde HTML con `Core/Fixtures/capturas/render.sh`.
 
 El proyecto de Xcode se genera desde `project.yml` con
 [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`), así
@@ -120,6 +152,10 @@ Otras variables para probar sin ratón:
 - `PARLA_CLICK_MENU="Ajustes…"` ejecuta ese ítem del menú de la barra al cabo de
   `PARLA_CLICK_AFTER` segundos (4 por defecto) y escribe en el log qué ventanas
   quedaron y si la app se activó.
+- `PARLA_CAPTURE_FILE=/ruta.png` salta la selección de región y usa ese archivo.
+  La ruta tiene que estar dentro del contenedor del sandbox
+  (`~/Library/Containers/app.schoolaid.Parla/Data/tmp/`). Con
+  `PARLA_CLICK_MENU="Capturar pantalla"` se prueba el flujo entero sin ratón.
 - `PARLA_PROBE_AUDIO=1` lista los dispositivos de audio con su UID y comprueba
   que se puede escribir la salida del sistema (escribe la que ya está puesta).
 - Una preferencia se puede cambiar para un solo arranque, sin tocar las
