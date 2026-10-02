@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import ParlaCore
 
 struct HistoryView: View {
     @Query(sort: \StoredCard.createdAt, order: .reverse) private var cards: [StoredCard]
@@ -8,16 +9,19 @@ struct HistoryView: View {
     private var filtered: [StoredCard] {
         guard !search.isEmpty else { return cards }
         return cards.filter {
-            $0.spanish.localizedStandardContains(search)
-                || $0.english.localizedStandardContains(search)
+            $0.source.localizedStandardContains(search)
+                || $0.result.localizedStandardContains(search)
         }
     }
 
     var body: some View {
         List(filtered) { card in
             VStack(alignment: .leading, spacing: 6) {
-                Text("«\(card.spanish)»").font(.caption).foregroundStyle(.secondary)
-                Text(card.english).font(.headline)
+                if let kind = card.kind.flatMap(CaptureKind.init(rawValue:)) {
+                    Text(kind.label).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                }
+                Text("«\(card.source)»").font(.caption).foregroundStyle(.secondary)
+                Text(card.result).font(.headline)
                 ForEach(Array(card.why.enumerated()), id: \.offset) { _, line in
                     Text("• \(line)").font(.callout)
                 }
