@@ -48,7 +48,11 @@ final class SetupMonitor {
         case .requestMicrophone: await sources.requestMicrophone()
         case .openMicrophoneSettings: sources.open(.microphone)
         case .requestScreenRecording: requestScreenRecording()
-        case .openScreenRecordingSettingsOrRelaunch: sources.open(.screenRecording)
+        case .openScreenRecordingSettingsOrRelaunch:
+            // Con otra firma (cada actualización ad hoc), macOS ya no conoce a
+            // Parla: pedirlo otra vez la vuelve a listar. Si ya la conoce, no hace nada.
+            sources.requestScreenRecording()
+            sources.open(.screenRecording)
         case .openLanguageSettings: sources.open(.languages)
         }
         await refresh()

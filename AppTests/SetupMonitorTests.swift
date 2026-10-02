@@ -97,8 +97,11 @@ private func scratchPreferences() -> (Preferences, () -> Void) {
     await monitor.perform(.openLanguageSettings)
     await monitor.perform(.unavailable)
 
+    // Ir a Ajustes por la pantalla vuelve a pedirla: con otra firma, macOS no
+    // conoce a Parla y no la listaría.
     #expect(sources.calls == ["requestMicrophone", "open microphone",
-                              "open screenRecording", "open languages"])
+                              "requestScreenRecording", "open screenRecording",
+                              "open languages"])
     #expect(monitor.status.isComplete)
 }
 

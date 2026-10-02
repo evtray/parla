@@ -224,22 +224,8 @@ final class AppState {
 
             do {
                 try await engine.start()
-            } catch TranscriberSetupError.microphoneDenied {
-                setup.refreshNow()
-                blockedMode = .voice
-                stop()
-                showPanel()
-                return
-            } catch TranscriberSetupError.localeUnsupported {
-                setupError = "Tu Mac no tiene un modelo de voz en español disponible."
-                stop()
-                showPanel()
-                return
             } catch {
-                Log.audio.error("no se pudo encender la escucha: \(error)")
-                setupError = "No se pudo encender la escucha."
-                stop()
-                showPanel()
+                voiceFailedToStart(error)
                 return
             }
 
@@ -268,6 +254,31 @@ final class AppState {
             }
         }
     }
+
+    /// La escucha no llegó a arrancar. Lo que pasó tiene que quedar en el panel,
+    /// que es lo único que se ve si se arrancó con el atajo.
+    ///
+    /// `stop()` va primero: esconde el panel y con él olvida el modo bloqueado,
+    /// así que lo que hay que enseñar se apunta después.
+    func voiceFailedToStart(_ error: any Error) {
+        stop()
+        switch error {
+        case TranscriberSetupError.microphoneDenied:
+            setup.refreshNow()
+            blockedMode = .voice
+        case TranscriberSetupError.localeUnsupported:
+            setupError = "Tu Mac no tiene un modelo de voz en español disponible."
+        default:
+            Log.audio.error("no se pudo encender la escucha: \(error)")
+            setupError = "No se pudo encender la escucha."
+        }
+        showPanel()
+    }
+
+    /// Sin escucha en marcha, el panel siempre se puede cerrar: un aviso que se
+    /// resuelve solo, o uno descartado desde el menú emergente, lo dejaba vacío
+    /// y sin forma de cerrarlo.
+    var panelCanClose: Bool { !isListening }
 
     private func stop() {
         isListening = false

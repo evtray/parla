@@ -135,7 +135,7 @@ micrófono, y al revés.
 
 ```bash
 make test      # 119 tests de Core, sin abrir Xcode
-make test-app  # 115 tests del target de la app, alojados en Parla.app
+make test-app  # 121 tests del target de la app, alojados en Parla.app
 make eval-capture  # manda Core/Fixtures/capturas a la API y cuenta aciertos del caso
 make run       # compila y lanza
 make install   # deja la app en /Applications

@@ -75,3 +75,49 @@ import ParlaCore
     coordinator.closeWelcome()
     #expect(preferences.hasSeenWelcome)
 }
+
+@Test func unaClaveEnviadaDosVecesNoSeSaltaLosPermisos() {
+    // Return dispara el envío del campo y el botón por defecto a la vez.
+    var flow = WelcomeFlow()
+    flow.advance()
+    flow.keySubmitted(.valid, hasSavedKey: true)
+    flow.keySubmitted(.valid, hasSavedKey: true)
+    #expect(flow.step == .permissions)
+}
+
+@Test func unaComprobacionQueLlegaTardeNoMueveOtroPaso() {
+    // «Ahora no» pulsado mientras se comprobaba la clave.
+    var flow = WelcomeFlow()
+    flow.advance()
+    flow.advance()
+    flow.keySubmitted(.unverified, hasSavedKey: true)
+    #expect(flow.step == .permissions)
+    #expect(flow.keyMessage == nil)
+}
+
+@Test @MainActor func salirDeParlaConLaBienvenidaAbiertaLaDaPorVista() {
+    // «Reabrir Parla» termina la app sin cerrar la ventana.
+    let name = "parla-tests-\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: name)!
+    defer { defaults.removePersistentDomain(forName: name) }
+    let preferences = Preferences(defaults: defaults)
+    let coordinator = WindowCoordinator(preferences: preferences,
+                                        studioContent: { _ in AnyView(EmptyView()) },
+                                        welcomeContent: { AnyView(EmptyView()) })
+    coordinator.showWelcome()
+    coordinator.appWillTerminate()
+    #expect(preferences.hasSeenWelcome)
+    coordinator.closeWelcome()
+}
+
+@Test @MainActor func salirSinLaBienvenidaAbiertaNoLaDaPorVista() {
+    let name = "parla-tests-\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: name)!
+    defer { defaults.removePersistentDomain(forName: name) }
+    let preferences = Preferences(defaults: defaults)
+    let coordinator = WindowCoordinator(preferences: preferences,
+                                        studioContent: { _ in AnyView(EmptyView()) },
+                                        welcomeContent: { AnyView(EmptyView()) })
+    coordinator.appWillTerminate()
+    #expect(!preferences.hasSeenWelcome)
+}

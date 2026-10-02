@@ -15,6 +15,7 @@ final class WindowCoordinator: NSObject, NSWindowDelegate {
     private let welcomeContent: @MainActor () -> AnyView
     private var studio: NSWindow?
     private var welcome: NSWindow?
+    private var terminationObserver: (any NSObjectProtocol)?
 
     init(preferences: Preferences = .shared,
          studioContent: @escaping @MainActor (StudioRouter) -> AnyView,
@@ -23,6 +24,11 @@ final class WindowCoordinator: NSObject, NSWindowDelegate {
         self.studioContent = studioContent
         self.welcomeContent = welcomeContent
         super.init()
+        terminationObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.willTerminateNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.appWillTerminate() }
+        }
     }
 
     func showStudio(_ section: StudioSection? = nil) {
@@ -52,6 +58,13 @@ final class WindowCoordinator: NSObject, NSWindowDelegate {
     /// avisos.
     func welcomeDidClose() {
         preferences.hasSeenWelcome = true
+    }
+
+    /// Salir con la bienvenida abierta también es cerrarla. «Reabrir Parla»
+    /// termina la app sin cerrar la ventana, y sin esto la bienvenida volvía a
+    /// empezar.
+    func appWillTerminate() {
+        if welcome?.isVisible == true { welcomeDidClose() }
     }
 
     func windowWillClose(_ notification: Notification) {

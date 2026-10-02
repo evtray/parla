@@ -69,10 +69,7 @@ struct PanelView: View {
                     }
                 }
 
-                if !state.isListening
-                    && (!state.visibleCards.isEmpty
-                        || !state.panelIssues.isEmpty
-                        || state.captureError != nil) {
+                if state.panelCanClose {
                     Button("Cerrar el panel") { state.hidePanel() }
                         .buttonStyle(.link)
                         .font(.caption)

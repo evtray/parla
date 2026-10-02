@@ -21,7 +21,12 @@ struct WelcomeFlow: Equatable {
 
     /// «Continuar» en el paso de la clave, con lo que respondió `APIKeyEntry`.
     /// `nil` es campo vacío: vale si ya había una clave guardada.
+    ///
+    /// Solo cuenta en el paso de la clave: Return dispara a la vez el campo y el
+    /// botón por defecto, y una comprobación lenta puede llegar después de
+    /// «Ahora no».
     mutating func keySubmitted(_ check: KeyCheck?, hasSavedKey: Bool) {
+        guard step == .key else { return }
         switch check {
         case .valid?:
             advance()

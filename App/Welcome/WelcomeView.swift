@@ -7,6 +7,9 @@ struct WelcomeView: View {
     let onFinish: () -> Void
     @State private var flow = WelcomeFlow()
     @State private var keyEntry = APIKeyEntry()
+    /// Return dispara el campo y el botón por defecto a la vez: una sola
+    /// comprobación.
+    @State private var isSubmitting = false
 
     private var setup: SetupMonitor { state.setup }
 
@@ -135,10 +138,13 @@ struct WelcomeView: View {
     }
 
     private func submitKey() {
+        guard !isSubmitting else { return }
+        isSubmitting = true
         Task {
             let check = await keyEntry.submit()
             setup.refreshNow()
             flow.keySubmitted(check, hasSavedKey: hasSavedKey)
+            isSubmitting = false
         }
     }
 }
