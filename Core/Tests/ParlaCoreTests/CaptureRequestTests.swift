@@ -63,7 +63,7 @@ private func captureRequest(forcing kind: CaptureKind? = nil) throws -> URLReque
     let format = try #require(output["format"] as? [String: Any])
     let schema = try #require(format["schema"] as? [String: Any])
     let required = try #require(schema["required"] as? [String])
-    #expect(Set(required) == ["kind", "source", "result", "why", "vocab"])
+    #expect(Set(required) == ["kind", "source", "target", "why", "vocab"])
     #expect(schema["additionalProperties"] as? Bool == false)
     let properties = try #require(schema["properties"] as? [String: Any])
     let kind = try #require(properties["kind"] as? [String: Any])
@@ -99,4 +99,23 @@ private func captureRequest(forcing kind: CaptureKind? = nil) throws -> URLReque
     for _ in 0 ..< 5 {
         #expect(try captureRequest().httpBody == first)
     }
+}
+
+@Test func elEsquemaPideLeerAntesDeResponder() throws {
+    // El modelo escribe los campos en el orden del esquema, y el cuerpo sale
+    // con las claves ordenadas. Si la respuesta va antes que el texto leído,
+    // la escribe sin haber transcrito nada y a veces la deja vacía.
+    let raw = String(data: try #require(captureRequest().httpBody), encoding: .utf8) ?? ""
+    let properties = try #require(raw.range(of: #""properties":{"#))
+    let tail = raw[properties.upperBound...]
+    let order = ["\"kind\":", "\"source\":", "\"target\":", "\"vocab\":", "\"why\":"]
+        .map { tail.range(of: $0)?.lowerBound }
+    #expect(order.allSatisfy { $0 != nil })
+    #expect(order.compactMap { $0 } == order.compactMap { $0 }.sorted())
+}
+
+@Test func laRespuestaViajaComoTarget() throws {
+    let json = #"{"kind":"correct","source":"I am agree","target":"I agree.","why":[],"vocab":[]}"#
+    let card = try JSONDecoder().decode(CaptureCard.self, from: Data(json.utf8))
+    #expect(card.result == "I agree.")
 }

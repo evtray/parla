@@ -7,7 +7,7 @@ private let capture = Capture(imageData: Data([1, 2, 3]),
                               capturedAt: Date(timeIntervalSince1970: 0))
 
 private let correctJSON = #"{"kind":"correct","source":"I am agree","#
-    + #""result":"I agree.","why":["\"Agree\" ya es verbo."],"vocab":[]}"#
+    + #""target":"I agree.","why":["\"Agree\" ya es verbo."],"vocab":[]}"#
 
 private func explainer(_ streamer: any HTTPStreamer, apiKey: String = "sk-test") -> ClaudeExplainer {
     ClaudeExplainer(streamer: streamer, builder: ClaudeRequestBuilder(), apiKey: apiKey)
@@ -32,14 +32,14 @@ private func instruction(of request: URLRequest) -> String? {
 }
 
 @Test func unSkipVuelveComoTarjetaNoComoNil() async throws {
-    let json = #"{"kind":"skip","source":"","result":"","why":[],"vocab":[]}"#
+    let json = #"{"kind":"skip","source":"","target":"","why":[],"vocab":[]}"#
     let card = try await explainer(FakeStreamer(lines: sseLines(forJSON: json)))
         .explainCapture(capture, forcing: nil)
     #expect(card.kind == .skip)
 }
 
 @Test func unCasoDesconocidoEsRespuestaMalformada() async {
-    let json = #"{"kind":"summarize","source":"","result":"","why":[],"vocab":[]}"#
+    let json = #"{"kind":"summarize","source":"","target":"","why":[],"vocab":[]}"#
     await #expect(throws: ExplainerError.malformedResponse) {
         try await explainer(FakeStreamer(lines: sseLines(forJSON: json)))
             .explainCapture(capture, forcing: nil)

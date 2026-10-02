@@ -13,8 +13,14 @@ enum SelectionOverlay {
                 ?? NSScreen.main
         else { return nil }
 
+        // Para devolverle el foco al terminar: capturar no debería sacarte de lo
+        // que estabas escribiendo.
+        let previous = NSWorkspace.shared.frontmostApplication
         return await withCheckedContinuation { continuation in
-            let window = OverlayWindow(screen: screen) { continuation.resume(returning: $0) }
+            let window = OverlayWindow(screen: screen) { rect in
+                if let previous, previous != NSRunningApplication.current { previous.activate() }
+                continuation.resume(returning: rect)
+            }
             // Sin activar la app, la capa no recibe el Esc.
             NSApp.activate(ignoringOtherApps: true)
             window.makeKeyAndOrderFront(nil)
@@ -23,7 +29,7 @@ enum SelectionOverlay {
     }
 }
 
-private final class OverlayWindow: NSWindow {
+final class OverlayWindow: NSWindow {
     private let finish: (CGRect?) -> Void
     private var finished = false
 
@@ -34,6 +40,11 @@ private final class OverlayWindow: NSWindow {
         level = .screenSaver
         isOpaque = false
         backgroundColor = NSColor.black.withAlphaComponent(0.15)
+        // Sin esto, sobre un vídeo a pantalla completa macOS cambia de
+        // escritorio en vez de poner la capa encima.
+        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
+        // Con ARC, `true` haría que `close()` soltara una vez de más. Sin
+        // retener la ventana en otro sitio, `orderOut` basta para que se libere.
         isReleasedWhenClosed = false
         contentView = SelectionView { [weak self] rect in self?.complete(rect) }
     }
@@ -56,7 +67,7 @@ private final class OverlayWindow: NSWindow {
     }
 }
 
-private final class SelectionView: NSView {
+final class SelectionView: NSView {
     private let onEnd: (CGRect?) -> Void
     private var start: CGPoint?
     private var current: CGPoint?
@@ -67,6 +78,10 @@ private final class SelectionView: NSView {
     }
 
     required init?(coder: NSCoder) { fatalError("no se usa desde un nib") }
+
+    /// Si la app aún no está activa, el primer clic no se gasta en activarla:
+    /// empieza el arrastre.
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
     private var selection: CGRect? {
         guard let start, let current else { return nil }

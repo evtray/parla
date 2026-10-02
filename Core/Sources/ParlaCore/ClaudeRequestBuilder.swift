@@ -108,11 +108,11 @@ public struct ClaudeRequestBuilder: Sendable {
             "properties": [
                 "kind": ["type": "string", "enum": CaptureKind.allCases.map(\.rawValue)],
                 "source": ["type": "string"],
-                "result": ["type": "string"],
+                "target": ["type": "string"],
                 "why": Self.whySchema,
                 "vocab": Self.vocabSchema,
             ],
-            "required": ["kind", "source", "result", "why", "vocab"],
+            "required": ["kind", "source", "target", "why", "vocab"],
             "additionalProperties": false,
         ]
     }

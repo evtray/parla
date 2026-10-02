@@ -41,6 +41,13 @@ public struct CaptureCard: Sendable, Equatable, Codable {
     public let why: [String]
     public let vocab: [VocabTerm]
 
+    /// En el JSON la respuesta se llama `target`. El cuerpo sale con las claves
+    /// en orden alfabético y el modelo escribe en el orden del esquema: así lee
+    /// (`source`) antes de responder (`target`).
+    enum CodingKeys: String, CodingKey {
+        case kind, source, result = "target", why, vocab
+    }
+
     public init(kind: CaptureKind, source: String, result: String,
                 why: [String], vocab: [VocabTerm]) {
         self.kind = kind

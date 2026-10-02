@@ -3,7 +3,7 @@ import Foundation
 @testable import ParlaCore
 
 @Test func laTarjetaDeCapturaSeDecodificaDelEsquema() throws {
-    let json = #"{"kind":"understand","source":"Heads up","result":"Ojo","#
+    let json = #"{"kind":"understand","source":"Heads up","target":"Ojo","#
         + #""why":["x"],"vocab":[{"term":"heads up","meaning":"ojo"}]}"#
     let card = try JSONDecoder().decode(CaptureCard.self, from: Data(json.utf8))
     #expect(card.kind == .understand)
@@ -14,7 +14,7 @@ import Foundation
 @Test func unCasoDesconocidoNoSeDecodifica() {
     // Si el modelo inventara un caso, la tarjeta no puede pintarse: mejor fallar
     // aquí que mostrar algo sin etiqueta.
-    let json = #"{"kind":"summarize","source":"","result":"","why":[],"vocab":[]}"#
+    let json = #"{"kind":"summarize","source":"","target":"","why":[],"vocab":[]}"#
     #expect(throws: DecodingError.self) {
         try JSONDecoder().decode(CaptureCard.self, from: Data(json.utf8))
     }

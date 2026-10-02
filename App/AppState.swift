@@ -412,7 +412,9 @@ final class AppState {
         Task {
             do {
                 let card = try await explainer.explainCapture(capture, forcing: forced)
-                Log.pipeline.info("captura: \(card.kind.rawValue) — \(card.source.prefix(60))")
+                // Solo el caso: el texto de la pantalla no va al log del sistema,
+                // que se guarda fuera del contenedor y acaba en los sysdiagnose.
+                Log.pipeline.info("captura: \(card.kind.rawValue)")
                 presentation.state = .readyCapture(card)
                 await store.save(capture: capture, card: card)
             } catch let error as ExplainerError {
