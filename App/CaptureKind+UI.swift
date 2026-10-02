@@ -11,6 +11,16 @@ extension CaptureKind {
         }
     }
 
+    /// El nombre del caso, sin icono: el historial pone el suyo.
+    var title: String {
+        switch self {
+        case .understand: "Para entender"
+        case .correct:    "Corrección"
+        case .translate:  "Traducción"
+        case .skip:       "Sin texto"
+        }
+    }
+
     /// Lo que ofrece «¿No era eso?». `skip` no se ofrece nunca.
     var menuLabel: String {
         switch self {
