@@ -95,6 +95,15 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            Section("Subtítulos") {
+                Toggle("Leer la traducción en voz alta", isOn: $state.readsSubtitlesAloud)
+                Text("Usa una voz en español de tu Mac. Las voces «mejoradas» suenan más "
+                     + "naturales y se descargan gratis en Ajustes del Sistema › "
+                     + "Accesibilidad › Contenido leído.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             Section("Atajo") {
                 KeyboardShortcuts.Recorder("Encender y apagar la escucha:",
                                           name: .toggleListening)

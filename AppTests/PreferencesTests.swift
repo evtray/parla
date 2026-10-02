@@ -57,3 +57,16 @@ private func withScratchDefaults(_ body: (UserDefaults) throws -> Void) rethrows
         #expect(Preferences(defaults: defaults).inputDeviceUID == nil)
     }
 }
+
+@Test func leerEnVozAltaVieneEncendido() {
+    withScratchDefaults { defaults in
+        #expect(Preferences(defaults: defaults).readsSubtitlesAloud)
+    }
+}
+
+@Test func apagarLaVozSobreviveAReabrirLaApp() {
+    withScratchDefaults { defaults in
+        Preferences(defaults: defaults).readsSubtitlesAloud = false
+        #expect(!Preferences(defaults: defaults).readsSubtitlesAloud)
+    }
+}

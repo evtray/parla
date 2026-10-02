@@ -14,6 +14,7 @@ struct Preferences: @unchecked Sendable {
         static let translationMode = "translationMode"
         static let model = "model"
         static let inputDeviceUID = "inputDeviceUID"
+        static let readsSubtitlesAloud = "readsSubtitlesAloud"
     }
 
     var translationMode: TranslationMode {
@@ -44,5 +45,12 @@ struct Preferences: @unchecked Sendable {
                 defaults.removeObject(forKey: Key.inputDeviceUID)
             }
         }
+    }
+
+    /// Leer en voz alta las frases traducidas de los subtítulos. Encendido si
+    /// nunca se tocó.
+    var readsSubtitlesAloud: Bool {
+        get { defaults.object(forKey: Key.readsSubtitlesAloud) as? Bool ?? true }
+        nonmutating set { defaults.set(newValue, forKey: Key.readsSubtitlesAloud) }
     }
 }

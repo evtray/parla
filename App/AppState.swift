@@ -29,6 +29,15 @@ final class AppState {
     @ObservationIgnored private var subtitleOverlay: SubtitleOverlay?
     @ObservationIgnored private var subtitleTask: Task<Void, Never>?
     @ObservationIgnored private var subtitleEngine: SpeechTranscriberEngine?
+    @ObservationIgnored private var subtitleSpeaker: SubtitleSpeaker?
+
+    /// Se persiste al cambiarlo. Apagarla calla lo que esté sonando.
+    var readsSubtitlesAloud: Bool = Preferences.shared.readsSubtitlesAloud {
+        didSet {
+            Preferences.shared.readsSubtitlesAloud = readsSubtitlesAloud
+            if !readsSubtitlesAloud { subtitleSpeaker?.stop() }
+        }
+    }
 
     /// Se persiste al cambiarlo: el modo sobrevive a cerrar la app.
     var mode: TranslationMode = Preferences.shared.translationMode {
@@ -411,6 +420,8 @@ final class AppState {
             }
             Log.pipeline.info("subtítulos encendidos")
 
+            let speaker = SubtitleSpeaker()
+            subtitleSpeaker = speaker
             let pipeline = SubtitlePipeline(transcriber: engine, translator: LiveTranslator())
             for await output in pipeline.outputs {
                 guard isSubtitling else { break }
@@ -423,6 +434,8 @@ final class AppState {
                     subtitleModel.isVisible = false
                 case .line(let line):
                     Log.pipeline.info("subtítulos: frase guardada")
+                    // Solo lo traducido: el inglés de una traducción fallida no se lee.
+                    if readsSubtitlesAloud, !line.spanish.isEmpty { speaker.say(line.spanish) }
                     await store.save(subtitle: line)
                 }
             }
@@ -443,6 +456,8 @@ final class AppState {
         let engine = subtitleEngine
         subtitleEngine = nil
         Task { await engine?.stop() }
+        subtitleSpeaker?.stop()
+        subtitleSpeaker = nil
         subtitleOverlay?.orderOut(nil)
         subtitleOverlay = nil
         subtitleModel.frame = nil
