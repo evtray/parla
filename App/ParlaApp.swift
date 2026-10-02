@@ -16,6 +16,12 @@ struct ParlaApp: App {
         KeyboardShortcuts.onKeyUp(for: .captureScreen) {
             Task { @MainActor in state.captureScreen() }
         }
+        KeyboardShortcuts.onKeyUp(for: .toggleSubtitles) {
+            Task { @MainActor in state.toggleSubtitles() }
+        }
+        if ProcessInfo.processInfo.environment["PARLA_SUBTITLES_AUTOSTART"] == "1" {
+            Task { @MainActor in state.toggleSubtitles() }
+        }
 
         // Afordancia de desarrollo: PARLA_AUTOSTART=1 enciende la escucha al
         // arrancar, para poder probar el pipeline desde la terminal sin clicar.
@@ -29,7 +35,8 @@ struct ParlaApp: App {
         MenuBarExtra {
             MenuBarView(state: state)
         } label: {
-            Image(systemName: state.isListening ? "mic.fill" : "mic")
+            Image(systemName: state.isSubtitling ? "captions.bubble.fill"
+                  : state.isListening ? "mic.fill" : "mic")
         }
 
         Settings { SettingsView(state: state) }
@@ -63,6 +70,9 @@ struct MenuBarView: View {
             state.toggleListening()
         }
         Button("Capturar pantalla") { state.captureScreen() }
+        Button(state.isSubtitling ? "Ocultar subtítulos" : "Mostrar subtítulos") {
+            state.toggleSubtitles()
+        }
         if state.mode == .batch, !state.pending.isEmpty {
             Button(state.pending.count == 1
                    ? "Traducir 1 frase"

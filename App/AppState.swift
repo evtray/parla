@@ -21,6 +21,14 @@ final class AppState {
     /// aplica hasta que la app se reabre, y el aviso lo dice.
     private(set) var needsScreenRecordingAccess = false
     private(set) var captureError: String?
+    private(set) var isSubtitling = false
+    /// Los idiomas de traducción no están descargados: el panel ofrece el
+    /// botón a Ajustes, porque la banda no se puede pulsar.
+    private(set) var needsTranslationLanguages = false
+    @ObservationIgnored let subtitleModel = SubtitleModel()
+    @ObservationIgnored private var subtitleOverlay: SubtitleOverlay?
+    @ObservationIgnored private var subtitleTask: Task<Void, Never>?
+    @ObservationIgnored private var subtitleEngine: SpeechTranscriberEngine?
 
     /// Se persiste al cambiarlo: el modo sobrevive a cerrar la app.
     var mode: TranslationMode = Preferences.shared.translationMode {
@@ -109,7 +117,15 @@ final class AppState {
         NSWorkspace.shared.open(url)
     }
 
+    /// Ajustes del Sistema › General › Idioma y región.
+    static func openLanguageSettings() {
+        let url = URL(string: "x-apple.systempreferences:com.apple.Localization-Settings.extension")!
+        NSWorkspace.shared.open(url)
+    }
+
     private func start() {
+        // Los dos modos usan el reconocimiento de voz: uno apaga al otro.
+        if isSubtitling { stopSubtitles() }
         guard let apiKey = KeychainStore.shared.apiKey else {
             setupError = ExplainerError.missingAPIKey.readableMessage
             showPanel()
@@ -328,6 +344,121 @@ final class AppState {
                 presentation.state = .failed(.network(error.localizedDescription))
             }
         }
+    }
+
+    // MARK: - Subtítulos del sistema
+
+    func toggleSubtitles() {
+        isSubtitling ? stopSubtitles() : startSubtitles()
+    }
+
+    private func startSubtitles() {
+        if isListening { stop() }
+        isSubtitling = true
+        needsTranslationLanguages = false
+        subtitleModel.notice = nil
+        subtitleModel.frame = nil
+        subtitleModel.isVisible = false
+        showSubtitleOverlay()
+
+        subtitleTask = Task {
+            let readiness = await LiveTranslator.readiness()
+            if let notice = LiveTranslator.notice(for: readiness) {
+                subtitleModel.notice = notice
+                needsTranslationLanguages = readiness == .needsLanguages
+                setupError = notice
+                showPanel()
+                try? await Task.sleep(for: .seconds(6))
+                stopSubtitles()
+                return
+            }
+
+            let engine = SpeechTranscriberEngine(
+                source: SystemAudioCapture(),
+                locales: [Locale(identifier: "en-US"), Locale(identifier: "en-GB")],
+                logsText: false)
+            subtitleEngine = engine
+            let downloadWatcher = Task { [weak self] in
+                while !Task.isCancelled {
+                    if case .downloadingModel(let fraction) = engine.phase {
+                        self?.subtitleModel.notice =
+                            "Descargando el modelo de inglés… \(Int(fraction * 100)) %"
+                    } else if self?.subtitleModel.notice?.hasPrefix("Descargando") == true {
+                        self?.subtitleModel.notice = nil
+                    }
+                    try? await Task.sleep(for: .milliseconds(300))
+                }
+            }
+            defer { downloadWatcher.cancel() }
+
+            do {
+                try await engine.start()
+            } catch TranscriberSetupError.screenRecordingDenied {
+                // Igual que la captura: el diálogo del sistema, una sola vez.
+                needsScreenRecordingAccess = true
+                if !askedForScreenAccess {
+                    askedForScreenAccess = true
+                    _ = CGRequestScreenCaptureAccess()
+                }
+                showPanel()
+                stopSubtitles()
+                return
+            } catch {
+                setupError = "No se pudieron encender los subtítulos (\(error))."
+                showPanel()
+                stopSubtitles()
+                return
+            }
+            Log.pipeline.info("subtítulos encendidos")
+
+            let pipeline = SubtitlePipeline(transcriber: engine, translator: LiveTranslator())
+            for await output in pipeline.outputs {
+                guard isSubtitling else { break }
+                switch output {
+                case .show(let frame):
+                    subtitleModel.notice = nil
+                    subtitleModel.frame = frame
+                    subtitleModel.isVisible = true
+                case .hide:
+                    subtitleModel.isVisible = false
+                case .line(let line):
+                    Log.pipeline.info("subtítulos: frase guardada")
+                    await store.save(subtitle: line)
+                }
+            }
+            // El stream terminó sin que nadie apagara: el audio se cortó y no volvió.
+            if isSubtitling {
+                setupError = "El audio del sistema se cortó y se apagaron los subtítulos."
+                showPanel()
+                stopSubtitles()
+            }
+        }
+    }
+
+    func stopSubtitles() {
+        guard isSubtitling else { return }
+        isSubtitling = false
+        subtitleTask?.cancel()
+        subtitleTask = nil
+        let engine = subtitleEngine
+        subtitleEngine = nil
+        Task { await engine?.stop() }
+        subtitleOverlay?.orderOut(nil)
+        subtitleOverlay = nil
+        subtitleModel.frame = nil
+        subtitleModel.isVisible = false
+        Log.pipeline.info("subtítulos apagados")
+    }
+
+    /// En la pantalla donde está el ratón al encenderlos.
+    private func showSubtitleOverlay() {
+        let mouse = NSEvent.mouseLocation
+        guard let screen = NSScreen.screens.first(where: { NSMouseInRect(mouse, $0.frame, false) })
+                ?? NSScreen.main
+        else { return }
+        let overlay = SubtitleOverlay(model: subtitleModel, screen: screen)
+        overlay.orderFrontRegardless()
+        subtitleOverlay = overlay
     }
 
     // MARK: - Captura de pantalla

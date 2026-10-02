@@ -7,6 +7,8 @@ extension KeyboardShortcuts.Name {
                                       default: .init(.space, modifiers: [.control, .option]))
     static let captureScreen = Self("captureScreen",
                                     initial: .init(.c, modifiers: [.control, .option]))
+    static let toggleSubtitles = Self("toggleSubtitles",
+                                      initial: .init(.s, modifiers: [.control, .option]))
 }
 
 struct SettingsView: View {
@@ -97,6 +99,7 @@ struct SettingsView: View {
                 KeyboardShortcuts.Recorder("Encender y apagar la escucha:",
                                           name: .toggleListening)
                 KeyboardShortcuts.Recorder("Capturar pantalla:", name: .captureScreen)
+                KeyboardShortcuts.Recorder("Mostrar u ocultar subtítulos:", name: .toggleSubtitles)
             }
         }
         .formStyle(.grouped)

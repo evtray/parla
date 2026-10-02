@@ -48,6 +48,11 @@ struct PanelView: View {
                     }
                 }
 
+                if state.needsTranslationLanguages {
+                    Button("Abrir Idioma y región") { AppState.openLanguageSettings() }
+                        .controlSize(.small)
+                }
+
                 if let error = state.captureError {
                     Text(error).font(.callout).foregroundStyle(.red)
                 }
