@@ -30,6 +30,7 @@ tiempo verbal, orden de palabras.
 | Transcripción de voz | **En tu Mac.** `SpeechAnalyzer` (macOS 26), sin conexión |
 | Traducción y explicación | API de Anthropic, con el modelo que elijas (Opus 5.5 por defecto) |
 | Lectura de capturas | API de Anthropic: la imagen de la región que seleccionas |
+| Subtítulos del sistema | **En tu Mac.** `SpeechAnalyzer` en inglés, la traducción de Apple y una voz de Apple, sin conexión |
 | Historial | SQLite local vía SwiftData |
 
 **Tu audio nunca sale del equipo.** Solo viaja el texto transcrito.
@@ -37,9 +38,12 @@ tiempo verbal, orden de palabras.
 **Las capturas sí salen:** la imagen de la región que seleccionas viaja a la API.
 No se guarda en tu Mac; al historial va solo el texto que Claude leyó en ella.
 
+**Los subtítulos no salen:** el audio del sistema se transcribe, se traduce y se
+lee en voz alta en tu Mac. En ese modo no se manda nada a la API.
+
 ## Requisitos
 
-- macOS 26 o posterior
+- macOS 26.4 o posterior
 - Xcode 26 (solo para compilar)
 - Una clave de API de Anthropic — se guarda en el Llavero, nunca en disco
 
@@ -94,11 +98,36 @@ La selección es una capa propia, no la de ⌘⇧4: dentro del sandbox,
 `screencapture -i` termina sin mostrar la cruz. La región se captura con
 ScreenCaptureKit.
 
+### Subtítulos de lo que suena
+
+Pulsa **⌃⌥S** (o «Mostrar subtítulos» en el menú de la barra) mientras ves un
+video en inglés. Abajo de la pantalla aparece la traducción al español mientras
+hablan, encima de cualquier app y también a pantalla completa. Los clics la
+atraviesan y se oculta en los silencios. Además, una voz en español lee cada
+frase en cuanto termina.
+
+- **Va al día:** mientras la voz habla, espera como mucho una frase, la más
+  reciente. En una conversación rápida se salta alguna, que sigue en la banda y
+  en el historial.
+- **La voz** es la mejor voz latinoamericana de tu Mac. Las «mejoradas» suenan
+  más naturales y se descargan gratis en Ajustes del Sistema › Accesibilidad ›
+  Contenido leído. Se apaga en Ajustes › Subtítulos.
+- **Traduce cualquier voz que suene:** un video, una llamada o una canción. Para
+  que no lo haga, apágalo con ⌃⌥S.
+
+Todo pasa en tu Mac: no hay coste ni hace falta conexión. Cada frase queda en el
+Historial con su inglés original; el filtro «Subtítulos» las separa de lo demás.
+
+Usa el mismo permiso de Grabación de pantalla que las capturas. Si faltan los
+idiomas de traducción, Parla te lleva a Ajustes del Sistema › General › Idioma y
+región › Idiomas de traducción. Encender los subtítulos apaga la escucha del
+micrófono, y al revés.
+
 ## Compilar
 
 ```bash
-make test      # 73 tests de Core, sin abrir Xcode
-make test-app  # 38 tests del target de la app, alojados en Parla.app
+make test      # 95 tests de Core, sin abrir Xcode
+make test-app  # 59 tests del target de la app, alojados en Parla.app
 make eval-capture  # manda Core/Fixtures/capturas a la API y cuenta aciertos del caso
 make run       # compila y lanza
 make install   # deja la app en /Applications
@@ -152,6 +181,10 @@ Otras variables para probar sin ratón:
 - `PARLA_CLICK_MENU="Ajustes…"` ejecuta ese ítem del menú de la barra al cabo de
   `PARLA_CLICK_AFTER` segundos (4 por defecto) y escribe en el log qué ventanas
   quedaron y si la app se activó.
+- `PARLA_SUBTITLES_AUTOSTART=1` enciende los subtítulos al arrancar. Para
+  probarlos sin un video, reproduce un audio desde una app con ventana (por
+  ejemplo, abriendo un `.m4a` en el navegador): el audio de `say` en la terminal
+  no se captura de forma fiable.
 - `PARLA_CAPTURE_FILE=/ruta.png` salta la selección de región y usa ese archivo.
   La ruta tiene que estar dentro del contenedor del sandbox
   (`~/Library/Containers/app.schoolaid.Parla/Data/tmp/`). Con
