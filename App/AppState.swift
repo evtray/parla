@@ -58,6 +58,15 @@ final class AppState {
 
     let audioDevices = AudioDeviceMonitor()
 
+    /// Qué falta por preparar. Lo leen la bienvenida, el menú emergente,
+    /// Estudio y el panel.
+    let setup = SetupMonitor(sources: LiveSetupSources())
+
+    init() {
+        setup.startObserving()
+        Task { await setup.refresh() }
+    }
+
     private func makeExplainer(apiKey: String) -> ClaudeExplainer {
         ClaudeExplainer(builder: model.requestBuilder, apiKey: apiKey)
     }
