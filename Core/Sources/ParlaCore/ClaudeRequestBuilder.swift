@@ -154,7 +154,11 @@ public struct ClaudeRequestBuilder: Sendable {
         request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
         request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
         request.setValue("server-side-fallback-2026-07-01", forHTTPHeaderField: "anthropic-beta")
-        request.httpBody = try JSONSerialization.data(withJSONObject: payload)
+        // Claves ordenadas: un diccionario de Swift no garantiza el orden, y el
+        // esquema de salida entra en el prefijo cacheado. Con el orden al azar,
+        // cada petición estrenaba caché y pagaba el system prompt entero.
+        request.httpBody = try JSONSerialization.data(withJSONObject: payload,
+                                                      options: [.sortedKeys])
         return request
     }
 

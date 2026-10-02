@@ -93,3 +93,10 @@ private func captureRequest(forcing kind: CaptureKind? = nil) throws -> URLReque
         try ClaudeRequestBuilder().makeCaptureRequest(for: capture, forcing: nil, apiKey: "")
     }
 }
+
+@Test func laCapturaSaleIgualByteAByte() throws {
+    let first = try captureRequest().httpBody
+    for _ in 0 ..< 5 {
+        #expect(try captureRequest().httpBody == first)
+    }
+}

@@ -82,3 +82,13 @@ private let utterance = Utterance(text: "necesito que me avises cuando llegues",
     #expect(!raw.contains("maxItems"))
     #expect(!raw.contains("minItems"))
 }
+
+@Test func elCuerpoSaleIgualByteAByte() throws {
+    // El esquema de salida entra en el prefijo cacheado: si sus claves cambian
+    // de orden entre peticiones, la caché del prompt no acierta nunca.
+    let builder = ClaudeRequestBuilder()
+    let first = try builder.makeRequest(for: utterance, apiKey: "k").httpBody
+    for _ in 0 ..< 5 {
+        #expect(try builder.makeRequest(for: utterance, apiKey: "k").httpBody == first)
+    }
+}
