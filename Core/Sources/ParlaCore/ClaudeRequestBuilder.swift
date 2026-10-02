@@ -11,12 +11,18 @@ public struct ClaudeRequestBuilder: Sendable {
     /// cabe en `batchMaxTokens` y el modelo la corta a mitad de una tarjeta.
     public static let chunkSize = 20
 
+    /// Un correo largo corregido, con su explicación y el razonamiento, no cabe
+    /// en el presupuesto de una frase.
+    public let captureMaxTokens: Int
+
     public init(model: String = "claude-opus-5-5",
                 maxTokens: Int = 4000,
-                batchMaxTokens: Int = 24000) {
+                batchMaxTokens: Int = 24000,
+                captureMaxTokens: Int = 16000) {
         self.model = model
         self.maxTokens = maxTokens
         self.batchMaxTokens = batchMaxTokens
+        self.captureMaxTokens = captureMaxTokens
     }
 
     private static let endpoint = URL(string: "https://api.anthropic.com/v1/messages")!
@@ -28,24 +34,34 @@ public struct ClaudeRequestBuilder: Sendable {
     // maxItems is not supported". Los límites de longitud se imponen desde el
     // system prompt, no desde el esquema.
 
+    /// `why` y `vocab` son iguales en la voz y en la captura: si divergieran, la
+    /// UI tendría que pintar dos formas de lo mismo.
+    private static var whySchema: [String: Any] {
+        ["type": "array", "items": ["type": "string"]]
+    }
+
+    private static var vocabSchema: [String: Any] {
+        [
+            "type": "array",
+            "items": [
+                "type": "object",
+                "properties": [
+                    "term": ["type": "string"],
+                    "meaning": ["type": "string"],
+                ],
+                "required": ["term", "meaning"],
+                "additionalProperties": false,
+            ],
+        ]
+    }
+
     /// Los campos de una tarjeta, compartidos por los dos esquemas para que no
     /// puedan divergir.
     private var cardProperties: [String: Any] {
         [
             "english": ["type": "string"],
-            "why": ["type": "array", "items": ["type": "string"]],
-            "vocab": [
-                "type": "array",
-                "items": [
-                    "type": "object",
-                    "properties": [
-                        "term": ["type": "string"],
-                        "meaning": ["type": "string"],
-                    ],
-                    "required": ["term", "meaning"],
-                    "additionalProperties": false,
-                ],
-            ],
+            "why": Self.whySchema,
+            "vocab": Self.vocabSchema,
             "skip": ["type": "boolean"],
         ]
     }
@@ -85,12 +101,29 @@ public struct ClaudeRequestBuilder: Sendable {
         ]
     }
 
+    /// El esquema de una captura. Coincide con `CaptureCard`.
+    private var captureSchema: [String: Any] {
+        [
+            "type": "object",
+            "properties": [
+                "kind": ["type": "string", "enum": CaptureKind.allCases.map(\.rawValue)],
+                "source": ["type": "string"],
+                "result": ["type": "string"],
+                "why": Self.whySchema,
+                "vocab": Self.vocabSchema,
+            ],
+            "required": ["kind", "source", "result", "why", "vocab"],
+            "additionalProperties": false,
+        ]
+    }
+
     // MARK: - Peticiones
 
     /// El cuerpo común. Los dos modos comparten el bloque `system` byte a byte:
     /// si difiriera, cada uno estrenaría su propia caché de prompt y el ahorro
     /// que motiva el lote se lo comería el prefijo sin cachear.
-    private func payload(content: String,
+    private func payload(system: String = SystemPrompt.text,
+                         content: Any,
                          schema: [String: Any],
                          maxTokens: Int) -> [String: Any] {
         [
@@ -105,7 +138,7 @@ public struct ClaudeRequestBuilder: Sendable {
             ],
             "system": [[
                 "type": "text",
-                "text": SystemPrompt.text,
+                "text": system,
                 "cache_control": ["type": "ephemeral"],
             ]],
             "messages": [["role": "user", "content": content]],
@@ -142,6 +175,46 @@ public struct ClaudeRequestBuilder: Sendable {
         return try request(payload(content: numbered,
                                    schema: batchSchema,
                                    maxTokens: batchMaxTokens),
+                           apiKey: apiKey)
+    }
+
+    /// El texto que acompaña a la imagen. Forzar `.skip` no tiene sentido y la
+    /// UI no lo ofrece: si llega, decide el modelo, igual que con `nil`.
+    public static func captureInstruction(forcing kind: CaptureKind?) -> String {
+        switch kind {
+        case .correct?:
+            "El usuario indica que este texto lo escribió él. El caso es correct."
+        case .understand?:
+            "El usuario indica que este texto no lo escribió él y quiere entenderlo. "
+                + "El caso es understand."
+        case .translate?:
+            "El usuario quiere saber cómo se dice este texto en inglés. El caso es translate."
+        case .skip?, nil:
+            "Decide tú el caso."
+        }
+    }
+
+    /// La imagen va antes que el texto, que es el orden que la documentación de
+    /// visión recomienda. El system prompt es el de captura y tiene su propia
+    /// caché: no comparte prefijo con el de la voz.
+    public func makeCaptureRequest(for capture: Capture,
+                                   forcing kind: CaptureKind?,
+                                   apiKey: String) throws -> URLRequest {
+        let content: [[String: Any]] = [
+            [
+                "type": "image",
+                "source": [
+                    "type": "base64",
+                    "media_type": capture.mediaType,
+                    "data": capture.imageData.base64EncodedString(),
+                ],
+            ],
+            ["type": "text", "text": Self.captureInstruction(forcing: kind)],
+        ]
+        return try request(payload(system: CaptureSystemPrompt.text,
+                                   content: content,
+                                   schema: captureSchema,
+                                   maxTokens: captureMaxTokens),
                            apiKey: apiKey)
     }
 }
