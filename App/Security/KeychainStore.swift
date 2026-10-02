@@ -10,11 +10,13 @@ struct KeychainStore: Sendable {
 
     var apiKey: String? {
         get {
+            #if DEBUG
             // Afordancia de desarrollo: cada compilación firmada ad hoc es una app
             // nueva para el Llavero y este pide contraseña, bloqueando el hilo
             // principal. Con PARLA_API_KEY la clave viene del entorno y no se toca.
             if let override = ProcessInfo.processInfo.environment["PARLA_API_KEY"],
                !override.isEmpty { return override }
+            #endif
             let query: [String: Any] = [
                 kSecClass as String: kSecClassGenericPassword,
                 kSecAttrService as String: service,

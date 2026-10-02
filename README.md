@@ -126,8 +126,8 @@ micrófono, y al revés.
 ## Compilar
 
 ```bash
-make test      # 95 tests de Core, sin abrir Xcode
-make test-app  # 59 tests del target de la app, alojados en Parla.app
+make test      # 97 tests de Core, sin abrir Xcode
+make test-app  # 61 tests del target de la app, alojados en Parla.app
 make eval-capture  # manda Core/Fixtures/capturas a la API y cuenta aciertos del caso
 make run       # compila y lanza
 make install   # deja la app en /Applications
@@ -214,3 +214,12 @@ a propósito.
 `ClaudeRequestBuilder.chunkSize` (20) es cuántas frases caben en una petición de
 lote. Subirlo ahorra peticiones pero arriesga que la respuesta no quepa en
 `batchMaxTokens` y el modelo corte una tarjeta a la mitad.
+
+## Licencia
+
+[MIT](LICENSE). Parla usa [KeyboardShortcuts](https://github.com/sindresorhus/KeyboardShortcuts),
+de Sindre Sorhus, también con licencia MIT: si distribuyes la app, incluye su
+aviso de copyright.
+
+Parla usa la API de Anthropic con la clave de cada usuario. No es un producto
+oficial de Anthropic.

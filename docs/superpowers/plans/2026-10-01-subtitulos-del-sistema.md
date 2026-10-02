@@ -238,7 +238,7 @@ instalación lo pierde.
 - [ ] **Step 3: Correr la sonda con voz de prueba**
 
 ```bash
-SONDA=/private/tmp/claude-501/-Users-edwinsandoval-Work-Free/6fcb88aa-8ba8-40a7-aba7-4479d2b39660/scratchpad/sonda-subtitulos.log
+SONDA=${TMPDIR:-/tmp}/parla/sonda-subtitulos.log
 pkill -f 'Parla.app/Contents/MacOS/Parla'; rm -f "$SONDA"
 open -n --env PARLA_PROBE_SUBTITLES=1 --env PARLA_STDERR_LOG=1 --stderr "$SONDA" /Applications/Parla.app
 sleep 3; say -v Samantha "Welcome back to the channel. Today we are going to learn how to set up the project from scratch."
@@ -1126,7 +1126,7 @@ Run: `make install`, y luego, con `open` para que macOS atribuya el permiso del
 micrófono a Parla y no a la Terminal:
 
 ```bash
-L=/private/tmp/claude-501/-Users-edwinsandoval-Work-Free/6fcb88aa-8ba8-40a7-aba7-4479d2b39660/scratchpad/voz.log
+L=${TMPDIR:-/tmp}/parla/voz.log
 pkill -f 'Parla.app/Contents/MacOS/Parla'; rm -f "$L"
 open -n --env PARLA_AUTOSTART=1 --env PARLA_STDERR_LOG=1 --stderr "$L" /Applications/Parla.app
 sleep 8; grep -E "locale resuelto|analizador arrancado|permiso" "$L"
@@ -2027,7 +2027,7 @@ Run: `make install`. Pide a Edwin que vuelva a conceder Grabación de pantalla.
 - [ ] **Step 6: De punta a punta con voz de prueba**
 
 ```bash
-L=/private/tmp/claude-501/-Users-edwinsandoval-Work-Free/6fcb88aa-8ba8-40a7-aba7-4479d2b39660/scratchpad/subtitulos.log
+L=${TMPDIR:-/tmp}/parla/subtitulos.log
 pkill -f 'Parla.app/Contents/MacOS/Parla'; rm -f "$L"
 open -n --env PARLA_SUBTITLES_AUTOSTART=1 --env PARLA_STDERR_LOG=1 --stderr "$L" /Applications/Parla.app
 sleep 8

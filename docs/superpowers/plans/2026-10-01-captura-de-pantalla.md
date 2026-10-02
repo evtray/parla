@@ -100,7 +100,7 @@ final. Lo único que queda es el resultado, escrito en el spec.
 - [ ] **Step 1: Crear la rama**
 
 ```bash
-cd /Users/edwinsandoval/Work/Free/translate
+cd "$(git rev-parse --show-toplevel)"
 git checkout feat/lote && git checkout -b feat/captura
 ```
 
@@ -164,7 +164,7 @@ desde la terminal, macOS atribuye el permiso de pantalla a la Terminal y la
 sonda mide lo que no es.
 
 ```bash
-SONDA=/private/tmp/claude-501/-Users-edwinsandoval-Work-Free/6fcb88aa-8ba8-40a7-aba7-4479d2b39660/scratchpad/sonda.log
+SONDA=${TMPDIR:-/tmp}/parla/sonda.log
 pkill -f 'Parla.app/Contents/MacOS/Parla'; rm -f "$SONDA"
 open -n --env PARLA_PROBE_CAPTURE=region --env PARLA_STDERR_LOG=1 --stderr "$SONDA" /Applications/Parla.app
 sleep 5; cat "$SONDA" | grep sonda
@@ -1159,7 +1159,7 @@ are reaping the benefits.</p>
 .row{padding:8px 16px;border-bottom:1px solid #e5e5e5;color:#666}.row b{color:#222;font-weight:400}
 .body{padding:16px;line-height:1.6}</style>
 <div class="bar">New Message</div>
-<div class="row">To: <b>Ms. Taylor &lt;s.taylor@acme.com&gt;</b></div>
+<div class="row">To: <b>Ms. Taylor &lt;s.taylor@example.com&gt;</b></div>
 <div class="row">From: <b>Edwin Sandoval</b></div>
 <div class="row">Subject: <b>Training on Monday</b></div>
 <div class="body">Dear Ms. Taylor,<br><br>I am writing to inform you that I will not can attend the training
@@ -1898,7 +1898,7 @@ Cópiala antes de tocar nada:
 
 ```bash
 cp -R ~/Library/Containers/app.schoolaid.Parla/Data/Library/Application\ Support \
-  /private/tmp/claude-501/-Users-edwinsandoval-Work-Free/6fcb88aa-8ba8-40a7-aba7-4479d2b39660/scratchpad/respaldo-historial
+  ${TMPDIR:-/tmp}/parla/respaldo-historial
 ```
 
 Luego `make run`, abre Historial desde el menú de la barra y confirma que las

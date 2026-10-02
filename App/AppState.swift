@@ -541,9 +541,11 @@ final class AppState {
     /// el flujo entero desde la terminal, sin ratón y sin permiso de pantalla.
     /// La ruta tiene que estar dentro del contenedor del sandbox.
     private func grabRegion() async throws -> Data? {
+        #if DEBUG
         if let path = ProcessInfo.processInfo.environment["PARLA_CAPTURE_FILE"] {
             return try Data(contentsOf: URL(fileURLWithPath: path))
         }
+        #endif
         return try await capturer.captureRegion()
     }
 

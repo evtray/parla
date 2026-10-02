@@ -19,16 +19,19 @@ struct ParlaApp: App {
         KeyboardShortcuts.onKeyUp(for: .toggleSubtitles) {
             Task { @MainActor in state.toggleSubtitles() }
         }
+
+        #if DEBUG
+        // Afordancias de desarrollo, solo en Debug: PARLA_AUTOSTART=1 enciende la
+        // escucha al arrancar y PARLA_SUBTITLES_AUTOSTART=1 los subtítulos, para
+        // probar desde la terminal sin clicar.
         if ProcessInfo.processInfo.environment["PARLA_SUBTITLES_AUTOSTART"] == "1" {
             Task { @MainActor in state.toggleSubtitles() }
         }
-
-        // Afordancia de desarrollo: PARLA_AUTOSTART=1 enciende la escucha al
-        // arrancar, para poder probar el pipeline desde la terminal sin clicar.
         if ProcessInfo.processInfo.environment["PARLA_AUTOSTART"] == "1" {
             Task { @MainActor in state.toggleListening() }
         }
         Task { @MainActor in DebugHooks.install() }
+        #endif
     }
 
     var body: some Scene {

@@ -1,3 +1,6 @@
+// Solo en Debug: usa una API privada de AppKit (`statusItem`) y variables de
+// entorno que no deben existir en la app que se distribuye.
+#if DEBUG
 import AppKit
 
 /// Afordancias de desarrollo para ejercitar la interfaz desde la terminal, donde
@@ -84,3 +87,4 @@ enum DebugHooks {
         }
     }
 }
+#endif
