@@ -136,6 +136,19 @@ Sin el permiso, macOS no falla: entrega una captura con las ventanas ajenas en
 blanco. Por eso la comprobación va antes, y no se intenta adivinar a partir de la
 imagen.
 
+**Resultado de la sonda (2026-10-01).** Desde el sandbox, y con el permiso
+concedido:
+
+| Prueba | Resultado |
+|---|---|
+| Sin permiso, `screencapture -R` | salida 1, sin archivo; `CGPreflightScreenCaptureAccess` = `false` |
+| Con permiso, `screencapture -R` | salida 0, PNG con el contenido real de otras apps |
+| Con permiso, `screencapture -i` | termina al instante con salida 0 y sin archivo; **la cruz no aparece** |
+| Con permiso, `SCScreenshotManager.captureImage(in:)` | 600×300 puntos → imagen de 1200×600 px |
+
+El modo interactivo de `screencapture` no funciona dentro del sandbox. **Se usa
+el plan B:** capa de selección propia + ScreenCaptureKit.
+
 ### 4.2 ImageDownscaler
 
 Límites verificados contra la documentación de visión (2026-10-01). Opus 5.5 y
@@ -516,7 +529,7 @@ repitieran, la evaluación mediría memoria y no detección.
 
 | Riesgo | Mitigación |
 |---|---|
-| `screencapture -i` no funciona dentro del sandbox | Prueba como primera tarea; plan B con ScreenCaptureKit (§ 4.1) |
+| `screencapture -i` no funciona dentro del sandbox | Confirmado en la sonda: se usa el plan B con ScreenCaptureKit (§ 4.1) |
 | Cada compilación ad hoc es una app nueva para TCC, así que el permiso de pantalla se pierde tras cada `make install` | Documentarlo en el README. `PARLA_CAPTURE_FILE` permite desarrollar sin el permiso |
 | La detección del caso falla más de lo aceptable | `make eval-capture` lo mide. Las palancas, en orden: subir el esfuerzo a `medium`, ajustar ejemplos, y «¿No era eso?» como red de seguridad |
 | Una región enorme (pantalla Retina entera) encarece cada captura | El tope de 4784 tokens visuales la limita a unos $0,02 en imagen |
