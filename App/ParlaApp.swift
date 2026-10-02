@@ -38,8 +38,9 @@ struct ParlaApp: App {
         MenuBarExtra {
             MenuBarView(state: state)
         } label: {
-            Image(systemName: state.isSubtitling ? "captions.bubble.fill"
-                  : state.isListening ? "mic.fill" : "mic")
+            // Un solo símbolo: qué modo está activo se ve en el menú emergente.
+            Image(systemName: state.isListening || state.isSubtitling
+                  ? "character.bubble.fill" : "character.bubble")
         }
 
         Settings { SettingsView(state: state) }
