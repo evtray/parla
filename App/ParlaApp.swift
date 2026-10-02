@@ -13,6 +13,9 @@ struct ParlaApp: App {
         KeyboardShortcuts.onKeyUp(for: .toggleListening) {
             Task { @MainActor in state.toggleListening() }
         }
+        KeyboardShortcuts.onKeyUp(for: .captureScreen) {
+            Task { @MainActor in state.captureScreen() }
+        }
 
         // Afordancia de desarrollo: PARLA_AUTOSTART=1 enciende la escucha al
         // arrancar, para poder probar el pipeline desde la terminal sin clicar.
@@ -59,6 +62,7 @@ struct MenuBarView: View {
         Button(state.isListening ? "Detener escucha" : "Empezar a escuchar") {
             state.toggleListening()
         }
+        Button("Capturar pantalla") { state.captureScreen() }
         if state.mode == .batch, !state.pending.isEmpty {
             Button(state.pending.count == 1
                    ? "Traducir 1 frase"

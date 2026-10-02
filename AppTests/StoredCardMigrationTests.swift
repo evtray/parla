@@ -44,6 +44,11 @@ enum LegacySchema: VersionedSchema {
 @Test func unaBaseConElEsquemaAnteriorConservaSusTarjetas() throws {
     let url = FileManager.default.temporaryDirectory
         .appending(path: "parla-migracion-\(UUID().uuidString).store")
+    defer {
+        for suffix in ["", "-shm", "-wal"] {
+            try? FileManager.default.removeItem(atPath: url.path + suffix)
+        }
+    }
 
     do {
         let legacy = try ModelContainer(for: Schema(versionedSchema: LegacySchema.self),

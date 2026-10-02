@@ -5,6 +5,8 @@ import KeyboardShortcuts
 extension KeyboardShortcuts.Name {
     static let toggleListening = Self("toggleListening",
                                       default: .init(.space, modifiers: [.control, .option]))
+    static let captureScreen = Self("captureScreen",
+                                    initial: .init(.c, modifiers: [.control, .option]))
 }
 
 struct SettingsView: View {
@@ -94,6 +96,7 @@ struct SettingsView: View {
             Section("Atajo") {
                 KeyboardShortcuts.Recorder("Encender y apagar la escucha:",
                                           name: .toggleListening)
+                KeyboardShortcuts.Recorder("Capturar pantalla:", name: .captureScreen)
             }
         }
         .formStyle(.grouped)

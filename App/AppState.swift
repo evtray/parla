@@ -17,6 +17,11 @@ final class AppState {
     private(set) var silentInputWarning: String?
     private(set) var cards: [CardPresentation] = []
 
+    /// Sin el permiso de Grabación de pantalla no se captura. macOS no lo
+    /// aplica hasta que la app se reabre, y el aviso lo dice.
+    private(set) var needsScreenRecordingAccess = false
+    private(set) var captureError: String?
+
     /// Se persiste al cambiarlo: el modo sobrevive a cerrar la app.
     var mode: TranslationMode = Preferences.shared.translationMode {
         didSet { Preferences.shared.translationMode = mode }
@@ -79,6 +84,12 @@ final class AppState {
     private var engine: SpeechTranscriberEngine?
     private var pipelineTask: Task<Void, Never>?
     private var panel: FloatingPanel?
+    @ObservationIgnored private let capturer = ScreenCapturer.live
+    /// Mientras la cruz está abierta, otro atajo no abre una segunda.
+    private var isSelectingRegion = false
+    /// `CGRequestScreenCaptureAccess` solo muestra el diálogo una vez por
+    /// identidad de app. Pedirlo más veces no hace nada.
+    private var askedForScreenAccess = false
 
     func toggleListening() {
         isListening ? stop() : start()
@@ -88,6 +99,13 @@ final class AppState {
     static func openMicrophoneSettings() {
         let url = URL(string:
             "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone")!
+        NSWorkspace.shared.open(url)
+    }
+
+    /// Abre el panel de Privacidad › Grabación de pantalla directamente.
+    static func openScreenRecordingSettings() {
+        let url = URL(string:
+            "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")!
         NSWorkspace.shared.open(url)
     }
 
@@ -198,6 +216,12 @@ final class AppState {
         } else {
             cards.append(CardPresentation(utterance: utterance, state: state))
         }
+        trimCards()
+    }
+
+    /// El panel guarda las 30 últimas. Al salir del búfer, la imagen de una
+    /// captura deja de existir en memoria.
+    private func trimCards() {
         if cards.count > 30 { cards.removeFirst(cards.count - 30) }
     }
 
@@ -280,6 +304,11 @@ final class AppState {
     // MARK: - Reintento de una tarjeta suelta
 
     func retry(_ presentation: CardPresentation) {
+        if presentation.capture != nil {
+            guard let apiKey = KeychainStore.shared.apiKey else { return }
+            sendCapture(presentation, apiKey: apiKey)
+            return
+        }
         guard let apiKey = KeychainStore.shared.apiKey,
               let utterance = presentation.utterance
         else { return }
@@ -292,6 +321,102 @@ final class AppState {
                     await store.save(utterance: utterance, card: card)
                 }
             } catch let error as ExplainerError {
+                presentation.state = .failed(error)
+            } catch {
+                presentation.state = .failed(.network(error.localizedDescription))
+            }
+        }
+    }
+
+    // MARK: - Captura de pantalla
+
+    /// La clave se comprueba antes de abrir la cruz: seleccionar una región
+    /// para luego enterarse de que falta la clave es trabajo tirado.
+    func captureScreen() {
+        guard !isSelectingRegion else { return }
+        guard let apiKey = KeychainStore.shared.apiKey else {
+            setupError = ExplainerError.missingAPIKey.readableMessage
+            showPanel()
+            return
+        }
+        isSelectingRegion = true
+        captureError = nil
+
+        Task {
+            defer { isSelectingRegion = false }
+
+            let png: Data?
+            do {
+                png = try await grabRegion()
+            } catch ScreenCapturer.Failure.noPermission {
+                needsScreenRecordingAccess = true
+                if !askedForScreenAccess {
+                    askedForScreenAccess = true
+                    _ = CGRequestScreenCaptureAccess()
+                }
+                showPanel()
+                return
+            } catch {
+                captureError = "No se pudo capturar la pantalla (\(error))."
+                showPanel()
+                return
+            }
+            // Esc: ni tarjeta, ni coste, ni mensaje.
+            guard let png else { return }
+            needsScreenRecordingAccess = false
+
+            let prepared: ImageDownscaler.Prepared
+            do {
+                prepared = try ImageDownscaler.prepare(png)
+            } catch ImageDownscaler.Failure.tooLarge {
+                captureError = "La región es demasiado grande. Selecciona menos."
+                showPanel()
+                return
+            } catch {
+                captureError = "No se pudo leer la captura."
+                showPanel()
+                return
+            }
+
+            let presentation = CardPresentation(capture: Capture(
+                imageData: prepared.data, mediaType: prepared.mediaType, capturedAt: Date()))
+            cards.append(presentation)
+            trimCards()
+            showPanel()
+            sendCapture(presentation, apiKey: apiKey)
+        }
+    }
+
+    /// `PARLA_CAPTURE_FILE` salta la selección y usa ese archivo: así se prueba
+    /// el flujo entero desde la terminal, sin ratón y sin permiso de pantalla.
+    /// La ruta tiene que estar dentro del contenedor del sandbox.
+    private func grabRegion() async throws -> Data? {
+        if let path = ProcessInfo.processInfo.environment["PARLA_CAPTURE_FILE"] {
+            return try Data(contentsOf: URL(fileURLWithPath: path))
+        }
+        return try await capturer.captureRegion()
+    }
+
+    /// «¿No era eso?»: la misma imagen, con el caso que el usuario eligió.
+    func reclassify(_ presentation: CardPresentation, as kind: CaptureKind) {
+        guard let apiKey = KeychainStore.shared.apiKey else { return }
+        presentation.forcedKind = kind
+        sendCapture(presentation, apiKey: apiKey)
+    }
+
+    private func sendCapture(_ presentation: CardPresentation, apiKey: String) {
+        guard let capture = presentation.capture else { return }
+        presentation.state = .pending
+        let explainer = makeExplainer(apiKey: apiKey)
+        let forced = presentation.forcedKind
+        Task {
+            do {
+                let card = try await explainer.explainCapture(capture, forcing: forced)
+                Log.pipeline.info("captura: \(card.kind.rawValue) — \(card.source.prefix(60))")
+                presentation.state = .readyCapture(card)
+                await store.save(capture: capture, card: card)
+            } catch let error as ExplainerError {
+                Log.pipeline.error("captura fallida: \(error.readableMessage)")
                 presentation.state = .failed(error)
             } catch {
                 presentation.state = .failed(.network(error.localizedDescription))

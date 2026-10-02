@@ -35,6 +35,23 @@ struct PanelView: View {
                     }
                 }
 
+                if state.needsScreenRecordingAccess {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Parla necesita permiso de Grabación de pantalla. Después de "
+                             + "darlo, cierra Parla y vuelve a abrirla: macOS no lo aplica antes.")
+                            .font(.callout)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Button("Abrir Ajustes del Sistema") {
+                            AppState.openScreenRecordingSettings()
+                        }
+                        .controlSize(.small)
+                    }
+                }
+
+                if let error = state.captureError {
+                    Text(error).font(.callout).foregroundStyle(.red)
+                }
+
                 if let warning = state.silentInputWarning {
                     Label(warning, systemImage: "exclamationmark.triangle.fill")
                         .font(.callout)
@@ -60,10 +77,19 @@ struct PanelView: View {
                 }
 
                 ForEach(state.visibleCards) { card in
-                    CardView(presentation: card) { state.retry(card) }
+                    if card.capture != nil {
+                        CaptureCardView(presentation: card,
+                                        onRetry: { state.retry(card) },
+                                        onReclassify: { state.reclassify(card, as: $0) })
+                    } else {
+                        CardView(presentation: card) { state.retry(card) }
+                    }
                 }
 
-                if !state.isListening && !state.visibleCards.isEmpty {
+                if !state.isListening
+                    && (!state.visibleCards.isEmpty
+                        || state.needsScreenRecordingAccess
+                        || state.captureError != nil) {
                     Button("Cerrar el panel") { state.hidePanel() }
                         .buttonStyle(.link)
                         .font(.caption)
