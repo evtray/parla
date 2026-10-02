@@ -65,6 +65,11 @@ final class SystemAudioCapture: NSObject, AudioSource {
                               delegate: self)
         try stream.addStreamOutput(output, type: .audio, sampleHandlerQueue: output.queue)
         try await stream.startCapture()
+        // Si stop() llegó mientras arrancaba, este stream ya no tiene dueño.
+        guard self.output === output else {
+            try? await stream.stopCapture()
+            return
+        }
         self.stream = stream
         Log.audio.info("audio del sistema: capturando")
     }

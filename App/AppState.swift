@@ -413,6 +413,8 @@ final class AppState {
                 stopSubtitles()
                 return
             } catch {
+                // Apagados mientras arrancaban: no es un error que enseñar.
+                guard isSubtitling, !(error is CancellationError) else { return }
                 setupError = "No se pudieron encender los subtítulos (\(error))."
                 showPanel()
                 stopSubtitles()

@@ -37,6 +37,8 @@ final class SpeechTranscriberEngine: Transcriber {
     private var analyzer: SpeechAnalyzer?
     private var transcriber: SpeechTranscriber?
     private var pump: Task<Void, Never>?
+    /// Reenvía el audio de la fuente al analizador y avisa cuando se acaba.
+    private var forwarding: Task<Void, Never>?
 
     /// Fase de arranque, para que la UI pueda mostrar descarga o error.
     private(set) var phase: TranscriberPhase = .idle
@@ -70,10 +72,36 @@ final class SpeechTranscriberEngine: Transcriber {
         Log.speech.info("formato del analizador: \(format.sampleRate) Hz, \(format.channelCount) canal(es)")
 
         let chunks = try await source.start(outputFormat: format)
-        let inputs = chunks.map { AnalyzerInput(buffer: $0.buffer) }
+        // Apagado mientras arrancaba: la fuente ya está capturando y nadie la
+        // pararía después. Se para aquí.
+        guard !Task.isCancelled else {
+            source.stop()
+            throw CancellationError()
+        }
 
+        // La entrada se reenvía a mano para saber cuándo se acaba: si la fuente
+        // muere (el audio del sistema se cortó y no volvió), el analizador cierra
+        // lo pendiente, el stream de resultados termina y con él el de eventos.
+        let (inputs, feed) = AsyncStream<AnalyzerInput>.makeStream()
         let analyzer = SpeechAnalyzer(modules: [transcriber])
-        try await analyzer.start(inputSequence: inputs)
+        do {
+            try await analyzer.start(inputSequence: inputs)
+            try Task.checkCancellation()
+        } catch {
+            source.stop()
+            await analyzer.cancelAndFinishNow()
+            throw error
+        }
+        // Fuera del hilo principal: mueve unos 50 buffers por segundo.
+        forwarding = Task.detached { [weak self] in
+            for await chunk in chunks { feed.yield(AnalyzerInput(buffer: chunk.buffer)) }
+            feed.finish()
+            try? await analyzer.finalizeAndFinishThroughEndOfInput()
+            // El stream de resultados no termina solo al acabarse la entrada
+            // (verificado: `finalizeAndFinishThroughEndOfInput` vuelve y
+            // `results` sigue abierto). Se corta aquí, y el bucle cierra `events`.
+            await self?.audioEnded()
+        }
 
         self.transcriber = transcriber
         self.analyzer = analyzer
@@ -98,17 +126,27 @@ final class SpeechTranscriberEngine: Transcriber {
                 Log.speech.error("el stream de resultados falló: \(String(describing: error))")
                 self.emit(.final(""))   // cierra lo pendiente
             }
+            // Sin esto, quien escucha `events` esperaría para siempre a una
+            // transcripción que ya no va a llegar.
+            self.relay.finish()
         }
     }
 
     func stop() async {
         pump?.cancel()
         pump = nil
+        forwarding?.cancel()
+        forwarding = nil
         await analyzer?.cancelAndFinishNow()
         analyzer = nil
         transcriber = nil
         source.stop()
         phase = .idle
+    }
+
+    private func audioEnded() {
+        Log.speech.info("la fuente de audio terminó")
+        pump?.cancel()
     }
 
     private nonisolated func emit(_ event: TranscriptEvent) {

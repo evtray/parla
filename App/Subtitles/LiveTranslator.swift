@@ -7,7 +7,7 @@ import Translation
 /// se habla.
 /// Clase y no `actor`: `TranslationSession` no es `Sendable` y el actor no
 /// puede pasársela a su propio método asíncrono. La sesión solo se toca desde
-/// `translate`.
+/// `translate`, de una llamada en una (`SerialGate`).
 final class LiveTranslator: Translator, @unchecked Sendable {
 
     enum Readiness: Equatable, Sendable {
@@ -24,8 +24,13 @@ final class LiveTranslator: Translator, @unchecked Sendable {
                                              target: LiveTranslator.spanish,
                                              preferredStrategy: .lowLatency)
 
+    /// El pipeline pide traducciones solapadas (un parcial y su final casi a la
+    /// vez), y `TranslationSession` no promete ser segura entre hilos: van de una
+    /// en una. Las respuestas viejas ya se descartan por número de orden.
+    private let gate = SerialGate()
+
     func translate(_ text: String) async throws -> String {
-        try await session.translate(text).targetText
+        try await gate.run { try await self.session.translate(text).targetText }
     }
 
     static func readiness() async -> Readiness {
