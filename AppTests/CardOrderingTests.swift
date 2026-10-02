@@ -13,7 +13,7 @@ private func presentation(_ text: String, at seconds: TimeInterval) -> CardPrese
     let cards = [presentation("primera", at: 10),
                  presentation("segunda", at: 20),
                  presentation("tercera", at: 30)]
-    #expect(AppState.mostRecent(cards).map(\.utterance.text)
+    #expect(AppState.mostRecent(cards).map(\.utterance?.text)
             == ["tercera", "segunda", "primera"])
 }
 
@@ -22,12 +22,21 @@ private func presentation(_ text: String, at seconds: TimeInterval) -> CardPrese
     // vuelve más tarde, no debe colarse arriba.
     let cards = [presentation("tardía pero antigua", at: 10),
                  presentation("reciente", at: 50)]
-    #expect(AppState.mostRecent(cards).first?.utterance.text == "reciente")
+    #expect(AppState.mostRecent(cards).first?.utterance?.text == "reciente")
 }
 
 @Test @MainActor func recortaALasTresMasRecientes() {
     let cards = (1...6).map { presentation("f\($0)", at: TimeInterval($0)) }
     let visible = AppState.mostRecent(cards)
     #expect(visible.count == 3)
-    #expect(visible.map(\.utterance.text) == ["f6", "f5", "f4"])
+    #expect(visible.map(\.utterance?.text) == ["f6", "f5", "f4"])
+}
+
+@Test @MainActor func mezclaVozYCapturasPorFecha() {
+    let voice = presentation("voz", at: 10)
+    let older = presentation("vieja", at: 5)
+    let capture = CardPresentation(capture: Capture(imageData: Data(), mediaType: "image/png",
+                                                    capturedAt: Date(timeIntervalSince1970: 20)))
+    #expect(AppState.mostRecent([voice, capture, older]).map(\.id)
+            == [capture.id, voice.id, older.id])
 }

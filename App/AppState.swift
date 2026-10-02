@@ -68,7 +68,7 @@ final class AppState {
     /// con la vista dónde apareció.
     static func mostRecent(_ cards: [CardPresentation],
                            limit: Int = 3) -> [CardPresentation] {
-        Array(cards.sorted { $0.utterance.startedAt > $1.utterance.startedAt }.prefix(limit))
+        Array(cards.sorted { $0.date > $1.date }.prefix(limit))
     }
 
     /// No opcional a propósito: un store ausente perdía tarjetas en silencio.
@@ -280,14 +280,16 @@ final class AppState {
     // MARK: - Reintento de una tarjeta suelta
 
     func retry(_ presentation: CardPresentation) {
-        guard let apiKey = KeychainStore.shared.apiKey else { return }
+        guard let apiKey = KeychainStore.shared.apiKey,
+              let utterance = presentation.utterance
+        else { return }
         presentation.state = .pending
         let explainer = makeExplainer(apiKey: apiKey)
         Task {
             do {
-                if let card = try await explainer.explain(presentation.utterance) {
+                if let card = try await explainer.explain(utterance) {
                     presentation.state = .ready(card)
-                    await store.save(utterance: presentation.utterance, card: card)
+                    await store.save(utterance: utterance, card: card)
                 }
             } catch let error as ExplainerError {
                 presentation.state = .failed(error)
