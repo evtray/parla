@@ -19,6 +19,13 @@ struct ParlaApp: App {
             Task { @MainActor in state.toggleSubtitles() }
         }
 
+        // El primer momento en que se puede enseñar una ventana.
+        _ = NotificationCenter.default.addObserver(
+            forName: NSApplication.didFinishLaunchingNotification, object: nil, queue: .main
+        ) { _ in
+            MainActor.assumeIsolated { state.showWelcomeIfFirstLaunch() }
+        }
+
         #if DEBUG
         // Afordancias de desarrollo, solo en Debug: PARLA_AUTOSTART=1 enciende la
         // escucha al arrancar y PARLA_SUBTITLES_AUTOSTART=1 los subtítulos, para

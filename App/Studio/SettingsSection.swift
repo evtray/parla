@@ -107,6 +107,9 @@ struct SettingsSection: View {
                 KeyboardShortcuts.Recorder("Capturar pantalla:", name: .captureScreen)
                 KeyboardShortcuts.Recorder("Mostrar u ocultar subtítulos:", name: .toggleSubtitles)
             }
+            Section("Bienvenida") {
+                Button("Ver la bienvenida otra vez") { state.windows.showWelcome() }
+            }
         }
         .formStyle(.grouped)
         .onAppear {

@@ -112,9 +112,19 @@ final class AppState {
                 AnyView(StudioView(state: self, router: router)
                     .modelContainer(Persistence.container))
             },
-            welcomeContent: { AnyView(EmptyView()) })
+            welcomeContent: { [unowned self] in
+                AnyView(WelcomeView(state: self, onFinish: { [unowned self] in
+                    self.windows.closeWelcome()
+                }))
+            })
         setup.startObserving()
         Task { await setup.refresh() }
+    }
+
+    /// La primera vez, la bienvenida; las demás, nada.
+    func showWelcomeIfFirstLaunch() {
+        guard !Preferences.shared.hasSeenWelcome else { return }
+        windows.showWelcome()
     }
 
     private func makeExplainer(apiKey: String) -> ClaudeExplainer {
