@@ -35,42 +35,13 @@ struct ParlaApp: App {
 
     var body: some Scene {
         MenuBarExtra {
-            MenuBarView(state: state)
+            MenuBarPopover(state: state)
+                .modelContainer(Persistence.container)
         } label: {
             // Un solo símbolo: qué modo está activo se ve en el menú emergente.
             Image(systemName: state.isListening || state.isSubtitling
                   ? "character.bubble.fill" : "character.bubble")
         }
-    }
-}
-
-struct MenuBarView: View {
-    @Bindable var state: AppState
-
-    var body: some View {
-        if let error = state.setupError {
-            Text(error).font(.caption).foregroundStyle(.red)
-        }
-        Button(state.isListening ? "Detener escucha" : "Empezar a escuchar") {
-            state.toggleListening()
-        }
-        Button("Capturar pantalla") { state.captureScreen() }
-        Button(state.isSubtitling ? "Ocultar subtítulos" : "Mostrar subtítulos") {
-            state.toggleSubtitles()
-        }
-        if state.mode == .batch, !state.pending.isEmpty {
-            Button(state.pending.count == 1
-                   ? "Traducir 1 frase"
-                   : "Traducir \(state.pending.count) frases") {
-                state.sendBatch()
-            }
-            .disabled(state.isSendingBatch)
-        }
-        Divider()
-        Button("Abrir Estudio…") { state.windows.showStudio(.history) }
-        Button("Ajustes…") { state.windows.showStudio(.settings) }
-            .keyboardShortcut(",", modifiers: .command)
-        Divider()
-        Button("Salir") { NSApplication.shared.terminate(nil) }
+        .menuBarExtraStyle(.window)
     }
 }
