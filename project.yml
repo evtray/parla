@@ -51,6 +51,7 @@ targets:
       base:
         SWIFT_VERSION: "6.0"
         CODE_SIGN_ENTITLEMENTS: App/Parla.entitlements
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ENABLE_HARDENED_RUNTIME: YES
         SWIFT_STRICT_CONCURRENCY: complete
 

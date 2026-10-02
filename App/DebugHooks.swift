@@ -13,6 +13,11 @@ enum DebugHooks {
     static func install() {
         let environment = ProcessInfo.processInfo.environment
         if environment["PARLA_PROBE_AUDIO"] == "1" { probeAudio() }
+        if let delays = environment["PARLA_SNAPSHOT_AFTER"] {
+            for delay in delays.split(separator: ",").compactMap({ Double($0) }) {
+                scheduleSnapshot(after: delay)
+            }
+        }
         guard let title = environment["PARLA_CLICK_MENU"] else { return }
         let delay = environment["PARLA_CLICK_AFTER"].flatMap(Double.init) ?? 4
 
@@ -75,6 +80,28 @@ enum DebugHooks {
             }
             Log.pipeline.info("hook: activa=\(NSApp.isActive) → ejecuta «\(title)»")
             menu.performActionForItem(at: index)
+        }
+    }
+
+    /// `PARLA_SNAPSHOT_AFTER=3,8`: a los 3 s y a los 8 s guarda una imagen de
+    /// cada ventana visible de Parla en el `tmp` del contenedor. Las capturas de
+    /// pantalla de fuera no ven una app de la barra de menús; la app sí puede
+    /// dibujarse a sí misma, sin permiso de Grabación de pantalla.
+    private static func scheduleSnapshot(after delay: Double) {
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(delay))
+            let folder = FileManager.default.temporaryDirectory.appending(path: "parla-snapshots")
+            try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            for (index, window) in NSApp.windows.enumerated() where window.isVisible {
+                guard let view = window.contentView?.superview ?? window.contentView,
+                      let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds)
+                else { continue }
+                view.cacheDisplay(in: view.bounds, to: rep)
+                let file = folder.appending(path: "\(Int(delay * 10))-\(index)-\(window.className).png")
+                try? rep.representation(using: .png, properties: [:])?.write(to: file)
+                Log.pipeline.info("hook: instantánea \(file.path)")
+            }
+            logWindows("instantánea a los \(delay) s")
         }
     }
 
