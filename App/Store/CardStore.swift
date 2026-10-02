@@ -21,4 +21,9 @@ actor CardStore {
         modelContext.insert(StoredCard(capture: capture, card: card))
         try? modelContext.save()
     }
+
+    func save(subtitle: SubtitleLine) {
+        modelContext.insert(StoredCard(subtitle: subtitle))
+        try? modelContext.save()
+    }
 }

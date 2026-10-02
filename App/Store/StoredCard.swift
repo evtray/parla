@@ -50,6 +50,16 @@ final class StoredCard {
                   kind: card.kind.rawValue,
                   vocab: card.vocab.map { StoredVocab(term: $0.term, meaning: $0.meaning) })
     }
+
+    convenience init(subtitle: SubtitleLine) {
+        self.init(id: UUID(),
+                  source: subtitle.english,
+                  result: subtitle.spanish,
+                  why: [],
+                  createdAt: subtitle.spokenAt,
+                  origin: "system",
+                  vocab: [])
+    }
 }
 
 @Model
