@@ -2,7 +2,7 @@ name: Parla
 options:
   bundleIdPrefix: app.schoolaid
   deploymentTarget:
-    macOS: "26.0"
+    macOS: "26.4"
   createIntermediateGroups: true
 
 packages:
@@ -42,7 +42,7 @@ targets:
         CFBundleName: Parla
         CFBundleShortVersionString: "0.1.0"
         CFBundleVersion: "1"
-        LSMinimumSystemVersion: "26.0"
+        LSMinimumSystemVersion: "26.4"
         # Sin icono en el Dock: la app vive en la barra de menú.
         LSUIElement: true
         NSMicrophoneUsageDescription: "Parla escucha tu voz para traducir al inglés lo que dices."
