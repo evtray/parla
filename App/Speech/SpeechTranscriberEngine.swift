@@ -5,13 +5,14 @@ import ParlaCore
 
 enum TranscriberSetupError: Error {
     case microphoneDenied
+    case screenRecordingDenied
     case localeUnsupported
     case assetUnavailable
 }
 
 enum TranscriberPhase: Sendable, Equatable {
     case idle
-    /// Fracción 0…1 de la descarga del modelo de español.
+    /// Fracción 0…1 de la descarga del modelo de voz.
     case downloadingModel(Double)
     case ready
     case failed(String)
@@ -27,32 +28,35 @@ final class SpeechTranscriberEngine: Transcriber {
     nonisolated let events: AsyncStream<(TranscriptEvent, Date)>
     private nonisolated let relay: AsyncStream<(TranscriptEvent, Date)>.Continuation
 
-    private let requestedLocale: Locale
-    private let inputDeviceUID: String?
+    private let source: any AudioSource
+    /// En orden de preferencia: el primero que el sistema soporte.
+    private let locales: [Locale]
+    /// `false` para el audio del sistema: el texto de lo que suena no va al log.
+    private let logsText: Bool
+
     private var analyzer: SpeechAnalyzer?
     private var transcriber: SpeechTranscriber?
-    private var audio: AudioCapture?
     private var pump: Task<Void, Never>?
 
     /// Fase de arranque, para que la UI pueda mostrar descarga o error.
     private(set) var phase: TranscriberPhase = .idle
 
-    /// `false` cuando el dispositivo de entrada acepta el tap pero no entrega
-    /// audio — el caso típico es un headset Bluetooth en modo A2DP.
-    var isReceivingAudio: Bool { audio?.isReceivingAudio ?? false }
-    var inputDeviceName: String { audio?.inputDeviceName ?? "el micrófono" }
+    var isReceivingAudio: Bool { source.isReceivingAudio }
+    var inputDeviceName: String { source.displayName }
 
-    /// `inputDeviceUID` a `nil` usa el micrófono del sistema.
-    init(locale: Locale = Locale(identifier: "es-419"), inputDeviceUID: String? = nil) {
-        self.requestedLocale = locale
-        self.inputDeviceUID = inputDeviceUID
+    init(source: any AudioSource, locales: [Locale], logsText: Bool = true) {
+        self.source = source
+        self.locales = locales
+        self.logsText = logsText
         (self.events, self.relay) = AsyncStream.makeStream()
     }
 
     func start() async throws {
-        guard await Self.microphoneGranted() else {
-            phase = .failed("micrófono denegado")
-            throw TranscriberSetupError.microphoneDenied
+        do {
+            try await source.requestAccess()
+        } catch {
+            phase = .failed("permiso denegado")
+            throw error
         }
         let locale = try await resolvedLocale()
         Log.speech.info("locale resuelto: \(locale.identifier)")
@@ -65,8 +69,7 @@ final class SpeechTranscriberEngine: Transcriber {
         ) else { throw TranscriberSetupError.assetUnavailable }
         Log.speech.info("formato del analizador: \(format.sampleRate) Hz, \(format.channelCount) canal(es)")
 
-        let capture = AudioCapture(preferredInputUID: inputDeviceUID)
-        let chunks = try capture.start(outputFormat: format)
+        let chunks = try await source.start(outputFormat: format)
         let inputs = chunks.map { AnalyzerInput(buffer: $0.buffer) }
 
         let analyzer = SpeechAnalyzer(modules: [transcriber])
@@ -74,7 +77,6 @@ final class SpeechTranscriberEngine: Transcriber {
 
         self.transcriber = transcriber
         self.analyzer = analyzer
-        self.audio = capture
         phase = .ready
         Log.speech.info("analizador arrancado")
 
@@ -83,7 +85,12 @@ final class SpeechTranscriberEngine: Transcriber {
             do {
                 for try await result in transcriber.results {
                     let text = String(result.text.characters)
-                    Log.speech.info("resultado \(result.isFinal ? "final" : "parcial"): \(text)")
+                    if self.logsText {
+                        Log.speech.info("resultado \(result.isFinal ? "final" : "parcial"): \(text)")
+                    } else {
+                        Log.speech.info("resultado \(result.isFinal ? "final" : "parcial"): "
+                            + "\(text.count) caracteres")
+                    }
                     self.emit(result.isFinal ? .final(text) : .partial(text))
                 }
                 Log.speech.info("el stream de resultados terminó")
@@ -94,24 +101,13 @@ final class SpeechTranscriberEngine: Transcriber {
         }
     }
 
-    /// El micrófono se pide explícitamente para poder distinguir "denegado" de
-    /// "no hay audio" y ofrecerle al usuario el botón a Ajustes del Sistema.
-    private static func microphoneGranted() async -> Bool {
-        switch AVCaptureDevice.authorizationStatus(for: .audio) {
-        case .authorized: return true
-        case .notDetermined: return await AVCaptureDevice.requestAccess(for: .audio)
-        default: return false
-        }
-    }
-
     func stop() async {
         pump?.cancel()
         pump = nil
         await analyzer?.cancelAndFinishNow()
         analyzer = nil
         transcriber = nil
-        audio?.stop()
-        audio = nil
+        source.stop()
         phase = .idle
     }
 
@@ -119,18 +115,18 @@ final class SpeechTranscriberEngine: Transcriber {
         relay.yield((event, Date()))
     }
 
-    /// `es-419` puede no estar; la API resuelve al equivalente soportado.
+    /// El primer idioma de la lista que el sistema soporte, en su variante
+    /// equivalente (`es-419` puede resolverse a otra).
     private func resolvedLocale() async throws -> Locale {
-        if let match = await SpeechTranscriber.supportedLocale(equivalentTo: requestedLocale) {
-            return match
+        for locale in locales {
+            if let match = await SpeechTranscriber.supportedLocale(equivalentTo: locale) {
+                return match
+            }
         }
-        if let fallback = await SpeechTranscriber.supportedLocale(
-            equivalentTo: Locale(identifier: "es-ES")
-        ) { return fallback }
         throw TranscriberSetupError.localeUnsupported
     }
 
-    /// Descarga el modelo de español si no está instalado.
+    /// Descarga el modelo del idioma si no está instalado.
     private func ensureAssets(for module: SpeechTranscriber) async throws {
         let status = await AssetInventory.status(forModules: [module])
         Log.speech.info("estado del modelo: \(String(describing: status))")

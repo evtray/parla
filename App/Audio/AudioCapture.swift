@@ -113,7 +113,7 @@ final class AudioCapture {
         // ve que no está en el hilo principal y aborta con SIGTRAP.
         let tap: AVAudioNodeTapBlock = { @Sendable [weak self] buffer, _ in
             let rms = Self.rms(of: buffer)
-            if let converted = Self.convert(buffer, to: outputFormat, using: converter) {
+            if let converted = AudioConversion.convert(buffer, to: outputFormat, using: converter) {
                 continuation?.yield(AudioChunk(buffer: converted))
             }
             Task { @MainActor in
@@ -168,29 +168,6 @@ final class AudioCapture {
     }
 
     /// Puras y sin estado: corren en el hilo de audio, nunca en el principal.
-    private nonisolated static func convert(_ buffer: AVAudioPCMBuffer,
-                                to format: AVAudioFormat,
-                                using converter: AVAudioConverter?) -> AVAudioPCMBuffer? {
-        guard let converter else { return nil }
-        let ratio = format.sampleRate / buffer.format.sampleRate
-        let capacity = AVAudioFrameCount(Double(buffer.frameLength) * ratio) + 1024
-        guard let output = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: capacity) else {
-            return nil
-        }
-        var consumed = false
-        var error: NSError?
-        converter.convert(to: output, error: &error) { _, status in
-            if consumed {
-                status.pointee = .noDataNow
-                return nil
-            }
-            consumed = true
-            status.pointee = .haveData
-            return buffer
-        }
-        return error == nil && output.frameLength > 0 ? output : nil
-    }
-
     /// Un resumen cada ~5 s: sirve para distinguir "no te oigo" de "no entiendo".
     private nonisolated static let levelReporter = LevelReporter()
 
@@ -225,5 +202,23 @@ final class LevelReporter: @unchecked Sendable {
         peak = 0; buffers = 0; lastReport = now
         lock.unlock()
         Log.audio.info("entrada: \(n) buffers en 5s, pico \(String(format: "%.3f", p))")
+    }
+}
+
+extension AudioCapture: AudioSource {
+    var displayName: String { inputDeviceName }
+
+    /// Se pide explícitamente para distinguir "denegado" de "no hay audio" y
+    /// ofrecer el botón a Ajustes del Sistema.
+    func requestAccess() async throws {
+        switch AVCaptureDevice.authorizationStatus(for: .audio) {
+        case .authorized:
+            return
+        case .notDetermined:
+            if await AVCaptureDevice.requestAccess(for: .audio) { return }
+        default:
+            break
+        }
+        throw TranscriberSetupError.microphoneDenied
     }
 }

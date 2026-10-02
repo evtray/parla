@@ -119,7 +119,9 @@ final class AppState {
         setupError = nil
         showPanel()
 
-        let engine = SpeechTranscriberEngine(inputDeviceUID: inputDeviceUID)
+        let engine = SpeechTranscriberEngine(
+            source: AudioCapture(preferredInputUID: inputDeviceUID),
+            locales: [Locale(identifier: "es-419"), Locale(identifier: "es-ES")])
         self.engine = engine
         let explainer = makeExplainer(apiKey: apiKey)
         let pipelineMode: SessionPipeline.Mode = mode == .batch ? .deferred : .immediate
