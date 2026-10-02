@@ -2,7 +2,7 @@ import SwiftUI
 import SwiftData
 import ParlaCore
 
-struct HistoryView: View {
+struct HistorySection: View {
     @Query(sort: \StoredCard.createdAt, order: .reverse) private var cards: [StoredCard]
     @State private var search = ""
     @State private var filter: HistoryFilter = .all
@@ -44,7 +44,6 @@ struct HistoryView: View {
             }
             .pickerStyle(.segmented)
         }
-        .frame(minWidth: 520, minHeight: 420)
     }
 }
 

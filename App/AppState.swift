@@ -2,6 +2,7 @@ import AppKit
 import Foundation
 import Observation
 import SwiftData
+import SwiftUI
 import ParlaCore
 
 @MainActor
@@ -62,7 +63,17 @@ final class AppState {
     /// Estudio y el panel.
     let setup = SetupMonitor(sources: LiveSetupSources())
 
+    /// Las ventanas de Estudio y de la bienvenida. Se crea en `init` porque su
+    /// contenido necesita a `self`.
+    @ObservationIgnored private(set) var windows: WindowCoordinator!
+
     init() {
+        windows = WindowCoordinator(
+            studioContent: { [unowned self] router in
+                AnyView(StudioView(state: self, router: router)
+                    .modelContainer(Persistence.container))
+            },
+            welcomeContent: { AnyView(EmptyView()) })
         setup.startObserving()
         Task { await setup.refresh() }
     }

@@ -1,5 +1,4 @@
 import SwiftUI
-import SwiftData
 import KeyboardShortcuts
 
 @main
@@ -42,29 +41,11 @@ struct ParlaApp: App {
             Image(systemName: state.isListening || state.isSubtitling
                   ? "character.bubble.fill" : "character.bubble")
         }
-
-        Settings { SettingsView(state: state) }
-
-        Window("Historial", id: "history") { HistoryView() }
-            .modelContainer(Persistence.container)
     }
 }
 
 struct MenuBarView: View {
     @Bindable var state: AppState
-    @Environment(\.openWindow) private var openWindow
-    @Environment(\.openSettings) private var openSettings
-
-    /// Parla vive en la barra de menús y nunca es la app activa. Sin activarla,
-    /// sus ventanas se abren sin foco y detrás de las de la app en uso, que es
-    /// lo mismo que no abrirse.
-    ///
-    /// `activate()` a secas no sirve: es cooperativa, y macOS la ignora cuando
-    /// quien la pide no es ya la app en uso.
-    private func inFront(_ open: () -> Void) {
-        NSApp.activate(ignoringOtherApps: true)
-        open()
-    }
 
     var body: some View {
         if let error = state.setupError {
@@ -86,8 +67,8 @@ struct MenuBarView: View {
             .disabled(state.isSendingBatch)
         }
         Divider()
-        Button("Historial…") { inFront { openWindow(id: "history") } }
-        Button("Ajustes…") { inFront { openSettings() } }
+        Button("Abrir Estudio…") { state.windows.showStudio(.history) }
+        Button("Ajustes…") { state.windows.showStudio(.settings) }
             .keyboardShortcut(",", modifiers: .command)
         Divider()
         Button("Salir") { NSApplication.shared.terminate(nil) }

@@ -2,21 +2,11 @@ import CoreAudio
 import SwiftUI
 import KeyboardShortcuts
 
-extension KeyboardShortcuts.Name {
-    static let toggleListening = Self("toggleListening",
-                                      default: .init(.space, modifiers: [.control, .option]))
-    static let captureScreen = Self("captureScreen",
-                                    initial: .init(.c, modifiers: [.control, .option]))
-    static let toggleSubtitles = Self("toggleSubtitles",
-                                      initial: .init(.s, modifiers: [.control, .option]))
-}
-
-struct SettingsView: View {
+struct SettingsSection: View {
     @Bindable var state: AppState
-    /// Se lee al aparecer y no en `init`: `Settings` construye la vista cada vez
-    /// que el cuerpo de la app se reevalúa, y si el Llavero pide permiso, la
-    /// lectura bloquea el hilo principal con la app entera.
-    @State private var apiKey = ""
+    @State private var keyEntry = APIKeyEntry()
+    /// Se pregunta sin leer la clave: el Llavero no pide contraseña.
+    @State private var hasKey = false
 
     private var systemInputLabel: String {
         state.audioDevices.defaultInputName.map { "El del sistema (\($0))" }
@@ -40,12 +30,19 @@ struct SettingsView: View {
     var body: some View {
         Form {
             Section("Clave de la API de Anthropic") {
-                SecureField("sk-ant-…", text: $apiKey)
-                    .onSubmit { KeychainStore.shared.apiKey = apiKey }
+                SecureField("Clave", text: $keyEntry.text,
+                            prompt: Text(hasKey ? "Guardada; pega otra para cambiarla" : "sk-ant-…"))
+                    .onSubmit(saveKey)
+                HStack {
+                    Button("Guardar", action: saveKey)
+                    if keyEntry.isChecking { ProgressView().controlSize(.small) }
+                }
+                if let message = keyEntry.message {
+                    Text(message).font(.caption)
+                }
                 Text("Se guarda en el Llavero de macOS, nunca en un archivo.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                Button("Guardar") { KeychainStore.shared.apiKey = apiKey }
             }
             Section("Modelo") {
                 Picker("Traducir con", selection: $state.model) {
@@ -112,13 +109,17 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        // Alto fijo y con desplazamiento: ajustada al contenido mide 830 pt y
-        // no cabe en la pantalla de un portátil de 13".
-        .frame(width: 420, height: 640)
-        .padding()
         .onAppear {
-            apiKey = KeychainStore.shared.apiKey ?? ""
+            hasKey = KeychainStore.shared.hasAPIKey
             state.audioDevices.start()
+        }
+    }
+
+    private func saveKey() {
+        Task {
+            await keyEntry.submit()
+            hasKey = KeychainStore.shared.hasAPIKey
+            state.setup.refreshNow()
         }
     }
 }
