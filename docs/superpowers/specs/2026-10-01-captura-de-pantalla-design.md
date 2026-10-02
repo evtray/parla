@@ -197,8 +197,8 @@ A diferencia de la voz, `explainCapture` **nunca devuelve `nil`**. Un `skip` vue
 como tarjeta con `kind == .skip`, porque el usuario hizo un gesto explícito y
 merece respuesta. La UI lo pinta como aviso breve.
 
-Antes de pedir nada se valida `forcing != .skip`: forzar un skip no tiene
-sentido.
+Forzar `.skip` no tiene sentido y la UI no lo ofrece. Si llega, se trata igual
+que `nil`: decide el modelo.
 
 ### 4.4 La petición
 
@@ -309,6 +309,8 @@ Las reglas nuevas, que no quedan a criterio de quien escriba el prompt:
    que no existen en español, registro. Lo transparente no se explica.
 7. **Caso forzado:** si el bloque de texto fija el caso, se obedece aunque las
    señales digan otra cosa.
+8. **Otro idioma:** si el texto no está ni en español ni en inglés, el caso es
+   `understand`. `result` es la traducción al español y `why` puede ir vacío.
 
 **Ejemplos obligatorios:** al menos uno por caso, más el caso mixto
 (mensaje + borrador) y un `skip`. Van en texto (lo que se vería en la imagen,
@@ -462,7 +464,7 @@ TDD como en el resto del proyecto.
   - el system prompt de captura lleva `cache_control`;
   - el esquema tiene el `enum`;
   - `max_tokens` es 16000;
-  - forzar `.skip` se rechaza.
+  - forzar `.skip` equivale a no forzar.
 - Decodificación de `CaptureCard`: los cuatro `kind`, y un `kind` desconocido →
   `malformedResponse`.
 - `explainCapture` con el streamer falso: cada caso, `skip`, `refusal`, stream
@@ -489,7 +491,7 @@ TDD como en el resto del proyecto.
   y `result`, y al final el acierto (`n/N`).
 - Necesita `PARLA_API_KEY` y gasta tokens, así que **no corre en `make test`**.
 
-Fixtures mínimas, siete:
+Fixtures mínimas, ocho:
 
 1. un artículo en inglés;
 2. un mensaje recibido en un chat;
@@ -497,7 +499,11 @@ Fixtures mínimas, siete:
 4. un mensaje recibido + un borrador propio;
 5. un correo propio con varios errores;
 6. texto en español;
-7. una imagen sin texto.
+7. una imagen sin texto;
+8. un mensaje recibido en francés (otro idioma → `understand`).
+
+Las fixtures no repiten los textos de los ejemplos del prompt. Si los
+repitieran, la evaluación mediría memoria y no detección.
 
 **Manual, con checklist:**
 
