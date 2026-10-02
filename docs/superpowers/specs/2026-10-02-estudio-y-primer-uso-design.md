@@ -60,11 +60,14 @@ sistema. La experiencia alrededor no ha crecido con ellas:
   la §10. Criterio: en Finder debe verse con la forma del sistema y sin la
   placa gris que macOS 26 pone a los iconos antiguos.
 - **Color de acento:** `AccentColor` en un catálogo de assets nuevo, con dos
-  valores: `#D85A30` en claro y `#F0997B` en oscuro. Se declara como acento
+  valores: `#B84A26` en claro y `#F0997B` en oscuro. El icono usa `#D85A30`,
+  más vivo, porque no lleva texto pequeño encima; en la interfaz, el blanco
+  sobre `#D85A30` solo llega a 3,9:1. Se declara como acento
   global (`ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME`) para que tiña
   controles, selección y `.tint` en toda la app.
 - **Texto sobre el acento:** un color emparejado con contraste ≥ 4.5:1 en los
-  dos modos: blanco sobre `#D85A30`, `#4A1B0C` sobre `#F0997B`.
+  dos modos: blanco sobre `#B84A26` (5,2:1), `#4A1B0C` sobre `#F0997B`
+  (6,6:1).
 - **Tipografía:** el inglés va en serif del sistema (New York) y el resto en la
   fuente del sistema. Las fuentes y colores de marca viven en un solo archivo
   (`App/UI/Theme.swift`), para que el sub-proyecto B lo reutilice.
@@ -99,6 +102,10 @@ sistema. La experiencia alrededor no ha crecido con ellas:
   siempre.
 - **`StudioRouter` (App).** Guarda qué sección de Estudio se muestra. Permite
   que el menú emergente y ⌘, abran Estudio directamente en Ajustes.
+- **`WindowCoordinator` (App).** Abre y reutiliza las ventanas de Estudio y de
+  la bienvenida: `NSWindow` con un `NSHostingController` de SwiftUI. Cualquiera
+  puede llamarlo, también el panel flotante, que vive fuera de las escenas de
+  SwiftUI y no tiene `openWindow`.
 - **`AppState`** se queda con el estado de ejecución: escuchando, subtitulando,
   errores de una sesión y cola por lotes. Pierde
   `needsMicrophoneAccess`, `needsScreenRecordingAccess` y
@@ -233,10 +240,10 @@ Los textos de cada pendiente (título, motivo y botón) se escriben en la App
 
 ### 5.4 Bienvenida
 
-- `Window("Bienvenida", id: "welcome")`, de tamaño fijo (~480 × 440) y centrada.
-- Se presenta sola al arrancar si `Preferences.hasSeenWelcome == false`, con
-  `defaultLaunchBehavior` (macOS 15+); si no, se suprime. Sin restauración de
-  estado. Activa la app al aparecer, para quedar delante.
+- Ventana de `WindowCoordinator`, de tamaño fijo (~480 × 440) y centrada.
+- `applicationDidFinishLaunching` la abre si
+  `Preferences.hasSeenWelcome == false`. Activa la app al aparecer, para quedar
+  delante.
 - **Pasos**, con indicador de progreso arriba y «Ahora no» y
   «Continuar» abajo:
   1. **Hola.** Qué hace Parla, en tres filas, una por modo, con icono y una
@@ -295,14 +302,16 @@ Los textos de cada pendiente (título, motivo y botón) se escriben en la App
 
 ### 5.6 Estudio
 
-- `Window("Estudio", id: "studio")` con `NavigationSplitView`, de
-  760 × 520 como mínimo. Sustituye a `Window("Historial")` y a la escena
-  `Settings`.
+- Ventana de `WindowCoordinator` con `NavigationSplitView`, de 760 × 520 como
+  mínimo. El `NSHostingController` pasa la barra de herramientas y el título a
+  la ventana (`sceneBridgingOptions`). Sustituye a `Window("Historial")` y a la
+  escena `Settings`.
 - **Barra lateral:** Historial arriba y Ajustes abajo. La selección vive en
   `StudioRouter`.
-- **Abrir Estudio** activa la app y llama a `openWindow(id: "studio")` después
-  de fijar la sección. ⌘, se declara con
-  `CommandGroup(replacing: .appSettings)` y abre Estudio en Ajustes.
+- **Abrir Estudio** es `WindowCoordinator.showStudio(_ section:)`: fija la
+  sección, activa la app y trae la ventana delante. ⌘, es un atajo de teclado
+  dentro de Estudio y del menú emergente, que son las únicas ventanas con foco
+  en las que tiene sentido.
 - **Aviso superior:** si `SetupStatus` tiene pendientes, una franja sobre el
   detalle los lista con la misma fila que el menú emergente
   (`SetupIssueRow`).
@@ -420,13 +429,14 @@ antemano:
    Composer: que XcodeGen lo incluya y que `actool` lo compile. Si no, se usa
    `AppIcon.appiconset` con un diseño a sangre completa. La prueba: Finder lo
    muestra con la forma del sistema y sin placa gris.
-4. **Bienvenida solo en el primer arranque.** Hay que comprobar que
-   `defaultLaunchBehavior` presenta la ventana en una app `LSUIElement` y que
-   queda delante. Si no, se abre desde `applicationDidFinishLaunching` con un
-   `NSWindow` que aloja la vista de SwiftUI.
-5. **⌘, en una app sin menú visible.** Con la app activa por Estudio,
-   `CommandGroup(replacing: .appSettings)` debe responder. Si no, ⌘, se
-   declara como atajo de la propia ventana.
+4. **Ventanas AppKit con contenido SwiftUI.** Hay que comprobar que la barra
+   de herramientas (filtro y búsqueda) aparece con `sceneBridgingOptions` y que
+   la ventana queda delante en una app `LSUIElement`, también al arrancar. Si
+   la barra no aparece, el filtro y la búsqueda van en una cabecera dentro del
+   contenido.
+5. **⌘, sin menú visible.** El atajo dentro de la vista debe responder con
+   Estudio o el menú emergente delante. Si no, un monitor local de teclado en
+   `WindowCoordinator`.
 
 ## 11. Decisiones registradas
 
@@ -444,3 +454,8 @@ antemano:
   el menú emergente, Estudio y el panel no puedan contradecirse.
 - **Comprobar la clave** con la lista de modelos: sin coste, y distingue «clave
   mala» de «sin red».
+- **Ventanas de Estudio y bienvenida en AppKit**, no escenas `Window`: el
+  panel flotante tiene que poder abrir Estudio, y abrir la bienvenida al
+  arrancar deja de depender de `defaultLaunchBehavior`.
+- **Acento `#B84A26` en claro**, no `#D85A30`: con el blanco encima, el segundo
+  no llega al 4,5:1 que pide el texto pequeño.
