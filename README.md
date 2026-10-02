@@ -49,10 +49,18 @@ lee en voz alta en tu Mac. En ese modo no se manda nada a la API.
 
 ## Uso
 
-1. Abre Parla. Vive en la barra de menú, no en el Dock.
-2. Ajustes → pega tu clave de API y elige un atajo global. Ahí mismo eliges el
-   modelo, el micrófono y la salida de audio del Mac.
-3. "Empezar a escuchar" y habla en español.
+1. Abre Parla. Vive en la barra de menú, no en el Dock. La primera vez sale una
+   bienvenida que te pide la clave de API (la comprueba antes de guardarla), los
+   permisos de micrófono y de pantalla, y te enseña los atajos. Cualquier paso se
+   puede saltar: lo que falte queda como aviso, con un botón para resolverlo.
+2. El icono de la barra abre un menú emergente con los tres modos (Voz, Captura y
+   Subtítulos), sus atajos, los avisos y la última frase.
+3. Pulsa Voz y habla en español.
+
+**Estudio** (desde el menú emergente) reúne el historial y los ajustes. En el
+historial filtras por modo o por favoritas, buscas, marcas frases con la
+estrella, copias el inglés o borras una frase con clic derecho. ⌘, abre Ajustes,
+donde eliges el modelo, el micrófono, la salida de audio del Mac y los atajos.
 
 La escucha es una sesión que enciendes y apagas: no se queda escuchando de fondo.
 El panel muestra las tres frases más recientes, la nueva arriba; el resto pasa al
@@ -78,7 +86,7 @@ reintento; el resto del lote llega igual.
 
 ### Capturar la pantalla
 
-Pulsa **⌃⌥C** (o «Capturar pantalla» en el menú de la barra) y arrastra un
+Pulsa **⌃⌥C** (o Captura en el menú emergente) y arrastra un
 rectángulo sobre el texto, como con ⌘⇧4. Esc cancela sin gastar nada. Parla
 decide qué hacer con lo que ve:
 
@@ -100,7 +108,7 @@ ScreenCaptureKit.
 
 ### Subtítulos de lo que suena
 
-Pulsa **⌃⌥S** (o «Mostrar subtítulos» en el menú de la barra) mientras ves un
+Pulsa **⌃⌥S** (o Subtítulos en el menú emergente) mientras ves un
 video en inglés. Abajo de la pantalla aparece la traducción al español mientras
 hablan, encima de cualquier app y también a pantalla completa. Los clics la
 atraviesan y se oculta en los silencios. Además, una voz en español lee cada
@@ -126,8 +134,8 @@ micrófono, y al revés.
 ## Compilar
 
 ```bash
-make test      # 97 tests de Core, sin abrir Xcode
-make test-app  # 61 tests del target de la app, alojados en Parla.app
+make test      # 119 tests de Core, sin abrir Xcode
+make test-app  # 115 tests del target de la app, alojados en Parla.app
 make eval-capture  # manda Core/Fixtures/capturas a la API y cuenta aciertos del caso
 make run       # compila y lanza
 make install   # deja la app en /Applications
@@ -178,17 +186,24 @@ PARLA_STDERR_LOG=1 PARLA_AUTOSTART=1 /Applications/Parla.app/Contents/MacOS/Parl
 `PARLA_AUTOSTART=1` enciende la escucha al arrancar, útil para probar sin clicar.
 Otras variables para probar sin ratón:
 
-- `PARLA_CLICK_MENU="Ajustes…"` ejecuta ese ítem del menú de la barra al cabo de
-  `PARLA_CLICK_AFTER` segundos (4 por defecto) y escribe en el log qué ventanas
-  quedaron y si la app se activó.
+- `PARLA_OPEN_MENU=1` abre el menú emergente al cabo de `PARLA_CLICK_AFTER`
+  segundos (4 por defecto) y escribe en el log qué ventanas quedaron y si la app
+  se activó.
+- `PARLA_SNAPSHOT_AFTER=3,8` guarda a los 3 s y a los 8 s una imagen de cada
+  ventana visible de Parla en
+  `~/Library/Containers/app.schoolaid.Parla/Data/tmp/parla-snapshots/`. Sirve
+  porque las capturas de pantalla de fuera no ven una app de la barra de menús;
+  las superficies de cristal salen en blanco.
+- `PARLA_APPEARANCE=dark` (o `light`) fuerza la apariencia de la app, para
+  revisar los dos modos sin tocar los ajustes del sistema.
 - `PARLA_SUBTITLES_AUTOSTART=1` enciende los subtítulos al arrancar. Para
   probarlos sin un video, reproduce un audio desde una app con ventana (por
   ejemplo, abriendo un `.m4a` en el navegador): el audio de `say` en la terminal
   no se captura de forma fiable.
 - `PARLA_CAPTURE_FILE=/ruta.png` salta la selección de región y usa ese archivo.
   La ruta tiene que estar dentro del contenedor del sandbox
-  (`~/Library/Containers/app.schoolaid.Parla/Data/tmp/`). Con
-  `PARLA_CLICK_MENU="Capturar pantalla"` se prueba el flujo entero sin ratón.
+  (`~/Library/Containers/app.schoolaid.Parla/Data/tmp/`). Con `PARLA_OPEN_MENU=1`
+  se abre el menú emergente y basta pulsar Captura.
 - `PARLA_PROBE_AUDIO=1` lista los dispositivos de audio con su UID y comprueba
   que se puede escribir la salida del sistema (escribe la que ya está puesta).
 - Una preferencia se puede cambiar para un solo arranque, sin tocar las
