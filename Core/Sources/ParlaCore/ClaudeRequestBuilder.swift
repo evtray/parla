@@ -11,7 +11,7 @@ public struct ClaudeRequestBuilder: Sendable {
     /// cabe en `batchMaxTokens` y el modelo la corta a mitad de una tarjeta.
     public static let chunkSize = 20
 
-    public init(model: String = "claude-opus-5",
+    public init(model: String = "claude-opus-5-5",
                 maxTokens: Int = 4000,
                 batchMaxTokens: Int = 24000) {
         self.model = model

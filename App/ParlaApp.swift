@@ -19,6 +19,7 @@ struct ParlaApp: App {
         if ProcessInfo.processInfo.environment["PARLA_AUTOSTART"] == "1" {
             Task { @MainActor in state.toggleListening() }
         }
+        Task { @MainActor in DebugHooks.install() }
     }
 
     var body: some Scene {
@@ -38,6 +39,18 @@ struct ParlaApp: App {
 struct MenuBarView: View {
     @Bindable var state: AppState
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.openSettings) private var openSettings
+
+    /// Parla vive en la barra de menús y nunca es la app activa. Sin activarla,
+    /// sus ventanas se abren sin foco y detrás de las de la app en uso, que es
+    /// lo mismo que no abrirse.
+    ///
+    /// `activate()` a secas no sirve: es cooperativa, y macOS la ignora cuando
+    /// quien la pide no es ya la app en uso.
+    private func inFront(_ open: () -> Void) {
+        NSApp.activate(ignoringOtherApps: true)
+        open()
+    }
 
     var body: some View {
         if let error = state.setupError {
@@ -55,8 +68,9 @@ struct MenuBarView: View {
             .disabled(state.isSendingBatch)
         }
         Divider()
-        Button("Historial…") { openWindow(id: "history") }
-        SettingsLink { Text("Ajustes…") }
+        Button("Historial…") { inFront { openWindow(id: "history") } }
+        Button("Ajustes…") { inFront { openSettings() } }
+            .keyboardShortcut(",", modifiers: .command)
         Divider()
         Button("Salir") { NSApplication.shared.terminate(nil) }
     }

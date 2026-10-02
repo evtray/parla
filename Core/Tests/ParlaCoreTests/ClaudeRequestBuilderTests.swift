@@ -23,9 +23,9 @@ private let utterance = Utterance(text: "necesito que me avises cuando llegues",
     #expect(request.value(forHTTPHeaderField: "content-type") == "application/json")
 }
 
-@Test func pideOpus5ConEsfuerzoBajoYStreaming() throws {
+@Test func pideOpus55ConEsfuerzoBajoYStreaming() throws {
     let json = try body(of: ClaudeRequestBuilder().makeRequest(for: utterance, apiKey: "k"))
-    #expect(json["model"] as? String == "claude-opus-5")
+    #expect(json["model"] as? String == "claude-opus-5-5")
     #expect(json["stream"] as? Bool == true)
     #expect(json["fallbacks"] as? String == "default")
     let output = try #require(json["output_config"] as? [String: Any])

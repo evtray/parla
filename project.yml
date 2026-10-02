@@ -12,6 +12,20 @@ packages:
   ParlaCore:
     path: Core
 
+# Sin esquema explícito Xcode genera uno que no incluye los tests, y
+# `xcodebuild test` termina en verde habiendo ejecutado cero.
+schemes:
+  Parla:
+    build:
+      targets:
+        Parla: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - ParlaTests
+
 targets:
   Parla:
     type: application

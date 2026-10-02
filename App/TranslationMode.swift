@@ -26,15 +26,3 @@ enum TranslationMode: String, CaseIterable, Sendable, Identifiable {
         }
     }
 }
-
-enum Preferences {
-    private static let translationModeKey = "translationMode"
-
-    static var translationMode: TranslationMode {
-        get {
-            UserDefaults.standard.string(forKey: translationModeKey)
-                .flatMap(TranslationMode.init(rawValue:)) ?? .immediate
-        }
-        set { UserDefaults.standard.set(newValue.rawValue, forKey: translationModeKey) }
-    }
-}

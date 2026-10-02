@@ -28,7 +28,7 @@ tiempo verbal, orden de palabras.
 | Etapa | Dónde corre |
 |---|---|
 | Transcripción de voz | **En tu Mac.** `SpeechAnalyzer` (macOS 26), sin conexión |
-| Traducción y explicación | API de Anthropic, `claude-opus-5` |
+| Traducción y explicación | API de Anthropic, con el modelo que elijas (Opus 5.5 por defecto) |
 | Historial | SQLite local vía SwiftData |
 
 **Tu audio nunca sale del equipo.** Solo viaja el texto transcrito.
@@ -42,7 +42,8 @@ tiempo verbal, orden de palabras.
 ## Uso
 
 1. Abre Parla. Vive en la barra de menú, no en el Dock.
-2. Ajustes → pega tu clave de API y elige un atajo global.
+2. Ajustes → pega tu clave de API y elige un atajo global. Ahí mismo eliges el
+   modelo, el micrófono y la salida de audio del Mac.
 3. "Empezar a escuchar" y habla en español.
 
 La escucha es una sesión que enciendes y apagas: no se queda escuchando de fondo.
@@ -70,7 +71,8 @@ reintento; el resto del lote llega igual.
 ## Compilar
 
 ```bash
-make test      # 51 tests
+make test      # 51 tests de Core, sin abrir Xcode
+make test-app  # 15 tests del target de la app, alojados en Parla.app
 make run       # compila y lanza
 make install   # deja la app en /Applications
 make release   # dist/Parla-X.Y.Z.zip
@@ -113,13 +115,26 @@ PARLA_STDERR_LOG=1 PARLA_AUTOSTART=1 /Applications/Parla.app/Contents/MacOS/Parl
 ```
 
 `PARLA_AUTOSTART=1` enciende la escucha al arrancar, útil para probar sin clicar.
+Otras variables para probar sin ratón:
+
+- `PARLA_CLICK_MENU="Ajustes…"` ejecuta ese ítem del menú de la barra al cabo de
+  `PARLA_CLICK_AFTER` segundos (4 por defecto) y escribe en el log qué ventanas
+  quedaron y si la app se activó.
+- `PARLA_PROBE_AUDIO=1` lista los dispositivos de audio con su UID y comprueba
+  que se puede escribir la salida del sistema (escribe la que ya está puesta).
+- Una preferencia se puede cambiar para un solo arranque, sin tocar las
+  guardadas, pasándola como argumento: `Parla -model claude-sonnet-5-5
+  -inputDeviceUID <uid>`.
+- `PARLA_API_KEY=sk-…` usa esa clave y no toca el Llavero. Cada compilación
+  firmada ad hoc es una app nueva para el Llavero, que pide contraseña y
+  bloquea el hilo principal hasta que respondes; con esto se evita.
 
 ### Si no transcribe nada
 
 El panel avisa cuando el dispositivo de entrada no entrega audio. La causa más
 común es un auricular Bluetooth: macOS lo mantiene en modo A2DP (solo salida) y su
-micrófono no produce ni un buffer. Elige otra entrada en Ajustes del Sistema →
-Sonido.
+micrófono no produce ni un buffer. Elige otro micrófono en Ajustes › Audio; vale
+para la siguiente vez que enciendas la escucha.
 
 ## Ajustes que querrás tocar
 

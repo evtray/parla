@@ -28,6 +28,7 @@ final class SpeechTranscriberEngine: Transcriber {
     private nonisolated let relay: AsyncStream<(TranscriptEvent, Date)>.Continuation
 
     private let requestedLocale: Locale
+    private let inputDeviceUID: String?
     private var analyzer: SpeechAnalyzer?
     private var transcriber: SpeechTranscriber?
     private var audio: AudioCapture?
@@ -41,8 +42,10 @@ final class SpeechTranscriberEngine: Transcriber {
     var isReceivingAudio: Bool { audio?.isReceivingAudio ?? false }
     var inputDeviceName: String { audio?.inputDeviceName ?? "el micrófono" }
 
-    init(locale: Locale = Locale(identifier: "es-419")) {
+    /// `inputDeviceUID` a `nil` usa el micrófono del sistema.
+    init(locale: Locale = Locale(identifier: "es-419"), inputDeviceUID: String? = nil) {
         self.requestedLocale = locale
+        self.inputDeviceUID = inputDeviceUID
         (self.events, self.relay) = AsyncStream.makeStream()
     }
 
@@ -62,7 +65,7 @@ final class SpeechTranscriberEngine: Transcriber {
         ) else { throw TranscriberSetupError.assetUnavailable }
         Log.speech.info("formato del analizador: \(format.sampleRate) Hz, \(format.channelCount) canal(es)")
 
-        let capture = AudioCapture()
+        let capture = AudioCapture(preferredInputUID: inputDeviceUID)
         let chunks = try capture.start(outputFormat: format)
         let inputs = chunks.map { AnalyzerInput(buffer: $0.buffer) }
 

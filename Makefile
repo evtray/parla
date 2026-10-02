@@ -11,10 +11,14 @@ TESTFLAGS := $(if $(wildcard $(XLIBS)/lib_TestingInterop.dylib), \
   -Xlinker -rpath -Xlinker $(XFRAMEWORKS) \
   -Xlinker -rpath -Xlinker $(XLIBS),)
 
-.PHONY: test generate build run install release open clean
+.PHONY: test test-app generate build run install release open clean
 
 test:
 	cd Core && swift test $(TESTFLAGS)
+
+# Corren alojados en Parla.app: lanzan la app de verdad como anfitriona.
+test-app: generate
+	xcodebuild -project Parla.xcodeproj -scheme Parla -destination 'platform=macOS' test
 
 generate:
 	xcodegen generate

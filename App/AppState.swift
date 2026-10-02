@@ -18,8 +18,26 @@ final class AppState {
     private(set) var cards: [CardPresentation] = []
 
     /// Se persiste al cambiarlo: el modo sobrevive a cerrar la app.
-    var mode: TranslationMode = Preferences.translationMode {
-        didSet { Preferences.translationMode = mode }
+    var mode: TranslationMode = Preferences.shared.translationMode {
+        didSet { Preferences.shared.translationMode = mode }
+    }
+
+    /// Vale para la siguiente escucha, lote o reintento: una sesión en marcha
+    /// no cambia de modelo a mitad.
+    var model: ClaudeModel = Preferences.shared.model {
+        didSet { Preferences.shared.model = model }
+    }
+
+    /// `nil` es el micrófono del sistema. Como el modelo, vale para la
+    /// siguiente escucha.
+    var inputDeviceUID: String? = Preferences.shared.inputDeviceUID {
+        didSet { Preferences.shared.inputDeviceUID = inputDeviceUID }
+    }
+
+    let audioDevices = AudioDeviceMonitor()
+
+    private func makeExplainer(apiKey: String) -> ClaudeExplainer {
+        ClaudeExplainer(builder: model.requestBuilder, apiKey: apiKey)
     }
 
     // MARK: - Estado del modo lote
@@ -83,9 +101,9 @@ final class AppState {
         setupError = nil
         showPanel()
 
-        let engine = SpeechTranscriberEngine()
+        let engine = SpeechTranscriberEngine(inputDeviceUID: inputDeviceUID)
         self.engine = engine
-        let explainer = ClaudeExplainer(apiKey: apiKey)
+        let explainer = makeExplainer(apiKey: apiKey)
         let pipelineMode: SessionPipeline.Mode = mode == .batch ? .deferred : .immediate
 
         pipelineTask = Task {
@@ -203,7 +221,7 @@ final class AppState {
         showPanel()
         for utterance in batch { upsert(utterance, .pending) }
 
-        let explainer = ClaudeExplainer(apiKey: apiKey)
+        let explainer = makeExplainer(apiKey: apiKey)
         Task {
             defer { isSendingBatch = false }
 
@@ -264,7 +282,7 @@ final class AppState {
     func retry(_ presentation: CardPresentation) {
         guard let apiKey = KeychainStore.shared.apiKey else { return }
         presentation.state = .pending
-        let explainer = ClaudeExplainer(apiKey: apiKey)
+        let explainer = makeExplainer(apiKey: apiKey)
         Task {
             do {
                 if let card = try await explainer.explain(presentation.utterance) {
