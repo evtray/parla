@@ -27,6 +27,18 @@ public struct ClaudeRequestBuilder: Sendable {
 
     private static let endpoint = URL(string: "https://api.anthropic.com/v1/messages")!
 
+    private static let modelsEndpoint = URL(string: "https://api.anthropic.com/v1/models?limit=1")!
+
+    /// La petición más barata que exige una clave válida: la lista de modelos no
+    /// consume tokens. Diez segundos bastan para saber si hay red.
+    public static func makeModelsRequest(apiKey: String) -> URLRequest {
+        var request = URLRequest(url: modelsEndpoint, timeoutInterval: 10)
+        request.httpMethod = "GET"
+        request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
+        request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
+        return request
+    }
+
     // MARK: - Esquemas
     //
     // Sin `minItems`/`maxItems`: la salida estructurada admite solo un
