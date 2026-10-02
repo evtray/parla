@@ -180,6 +180,24 @@ public enum SubtitleOutput: Sendable, Equatable {
   - `.unsupported` → aviso y el modo no se enciende.
 - Un `actor`, para que las traducciones no se pisen entre sí.
 
+**Resultado de la sonda (2026-10-01).** Dentro del sandbox, con un `say` en
+inglés sonando:
+
+| Prueba | Resultado |
+|---|---|
+| Audio del sistema con `SCStream`, 10 s | 504 buffers, 48 kHz mono, pico 0,69 |
+| Idiomas inglés → español antes de instalarlos | `supported`; `canRequestDownloads = false`; `prepareTranslation()` falla con `notInstalled` |
+| Idiomas después de instalarlos en Ajustes del Sistema | `installed` |
+| `translate` con `.lowLatency`, media de 20 frases | 78 ms |
+| `translate` con `.highFidelity`, media de 20 frases | 69 ms, mismo texto en las 5 frases comparadas |
+
+Decisiones:
+- **La app no puede pedir la descarga de los idiomas.** Se usa el aviso con el
+  botón a Ajustes del Sistema.
+- **Se mantiene `.lowLatency`.** Las dos estrategias dan la misma calidad y
+  ninguna se acerca al objetivo de 0,5 s. La latencia la pone la transcripción,
+  no la traducción.
+
 ### 4.4 SubtitleOverlay
 
 - `NSPanel` con `styleMask` `[.borderless, .nonactivatingPanel]`.
@@ -316,9 +334,9 @@ inyectado:
 
 | Riesgo | Mitigación |
 |---|---|
-| ScreenCaptureKit no entrega audio dentro del sandbox | Sonda como primera tarea. Alternativa: process taps de Core Audio (`AudioHardwareCreateProcessTap`), con su propio permiso de audio del sistema |
+| ScreenCaptureKit no entrega audio dentro del sandbox | Descartado en la sonda: entrega audio (§ 4.3) |
 | Los idiomas de traducción no están instalados y la app no puede pedir la descarga | Aviso con instrucciones y el botón a Ajustes del Sistema |
-| `.lowLatency` traduce peor que la estrategia por defecto | La sonda compara las dos con las mismas 20 frases; si la diferencia es grande, se usa la de por defecto para los finales |
+| `.lowLatency` traduce peor que la estrategia por defecto | Descartado en la sonda: mismo texto y la misma velocidad (§ 4.3) |
 | La banda no queda encima de un video a pantalla completa | Se verifica el `level` a mano; el panel ya resuelve un caso parecido |
 | `SpeechAnalyzer` tarda en cerrar frases en un audio sin pausas (música de fondo) | El parcial se sigue viendo y traduciendo; la banda muestra el final del texto |
 
