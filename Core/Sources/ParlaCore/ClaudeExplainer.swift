@@ -160,3 +160,19 @@ public struct ClaudeExplainer: Explainer {
         return result
     }
 }
+
+// MARK: - Captura
+
+extension ClaudeExplainer: CaptureExplainer {
+    public func explainCapture(_ capture: Capture,
+                               forcing kind: CaptureKind?) async throws -> CaptureCard {
+        let request = try builder.makeCaptureRequest(for: capture, forcing: kind, apiKey: apiKey)
+        let json = try await streamJSON(request)
+
+        guard let data = json.data(using: .utf8),
+              let card = try? JSONDecoder().decode(CaptureCard.self, from: data)
+        else { throw ExplainerError.malformedResponse }
+
+        return card
+    }
+}
