@@ -11,7 +11,7 @@ TESTFLAGS := $(if $(wildcard $(XLIBS)/lib_TestingInterop.dylib), \
   -Xlinker -rpath -Xlinker $(XFRAMEWORKS) \
   -Xlinker -rpath -Xlinker $(XLIBS),)
 
-.PHONY: test test-app generate build run install release open clean
+.PHONY: test test-app eval-capture generate build run install release open clean
 
 test:
 	cd Core && swift test $(TESTFLAGS)
@@ -19,6 +19,11 @@ test:
 # Corren alojados en Parla.app: lanzan la app de verdad como anfitriona.
 test-app: generate
 	xcodebuild -project Parla.xcodeproj -scheme Parla -destination 'platform=macOS' test
+
+# Manda las capturas de Core/Fixtures/capturas a la API real y cuenta cuántas
+# veces acierta el caso. Necesita PARLA_API_KEY y gasta tokens: no es un test.
+eval-capture:
+	cd Core && swift run parla-eval Fixtures/capturas
 
 generate:
 	xcodegen generate
