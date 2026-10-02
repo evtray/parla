@@ -17,6 +17,9 @@ final class StoredCard {
     var origin: String = "voice"
     /// `CaptureKind.rawValue`; `nil` en las tarjetas de voz.
     var kind: String?
+    /// Marcada con la estrella del historial. Con valor por defecto para que
+    /// las filas antiguas migren solas, como `origin`.
+    var isFavorite: Bool = false
     @Relationship(deleteRule: .cascade) var vocab: [StoredVocab]
 
     init(id: UUID, source: String, result: String, why: [String], createdAt: Date,

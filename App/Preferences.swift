@@ -15,6 +15,8 @@ struct Preferences: @unchecked Sendable {
         static let model = "model"
         static let inputDeviceUID = "inputDeviceUID"
         static let readsSubtitlesAloud = "readsSubtitlesAloud"
+        static let hasSeenWelcome = "hasSeenWelcome"
+        static let screenRecordingRequested = "screenRecordingRequested"
     }
 
     var translationMode: TranslationMode {
@@ -52,5 +54,20 @@ struct Preferences: @unchecked Sendable {
     var readsSubtitlesAloud: Bool {
         get { defaults.object(forKey: Key.readsSubtitlesAloud) as? Bool ?? true }
         nonmutating set { defaults.set(newValue, forKey: Key.readsSubtitlesAloud) }
+    }
+
+    /// La bienvenida sale sola solo la primera vez. Cerrarla en cualquier paso
+    /// cuenta como vista.
+    var hasSeenWelcome: Bool {
+        get { defaults.bool(forKey: Key.hasSeenWelcome) }
+        nonmutating set { defaults.set(newValue, forKey: Key.hasSeenWelcome) }
+    }
+
+    /// macOS enseña el diálogo de Grabación de pantalla una sola vez por app.
+    /// Recordarlo entre arranques decide si se ofrece «Permitir» o Ajustes del
+    /// Sistema.
+    var screenRecordingRequested: Bool {
+        get { defaults.bool(forKey: Key.screenRecordingRequested) }
+        nonmutating set { defaults.set(newValue, forKey: Key.screenRecordingRequested) }
     }
 }

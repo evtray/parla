@@ -69,5 +69,6 @@ enum LegacySchema: VersionedSchema {
     #expect(stored.first?.result == "I don't mind.")
     #expect(stored.first?.origin == "voice")
     #expect(stored.first?.kind == nil)
+    #expect(stored.first?.isFavorite == false)
     #expect(stored.first?.vocab.first?.term == "either way")
 }
