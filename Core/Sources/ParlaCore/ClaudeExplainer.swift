@@ -23,9 +23,8 @@ public struct ClaudeExplainer: Explainer {
         return error["message"] as? String
     }
 
-    public func explain(_ utterance: Utterance) async throws -> Card? {
-        let request = try builder.makeRequest(for: utterance, apiKey: apiKey)
-
+    /// Manda la petición y devuelve el JSON que el modelo fue escribiendo.
+    private func streamJSON(_ request: URLRequest) async throws -> String {
         let response: HTTPStreamResponse
         do {
             response = try await streamer.stream(request)
@@ -67,11 +66,113 @@ public struct ClaudeExplainer: Explainer {
         }
 
         if stopReason == "refusal" { throw ExplainerError.refused }
+        return json
+    }
+
+    public func explain(_ utterance: Utterance) async throws -> Card? {
+        let json = try await streamJSON(builder.makeRequest(for: utterance, apiKey: apiKey))
 
         guard let data = json.data(using: .utf8),
               let card = try? JSONDecoder().decode(Card.self, from: data)
         else { throw ExplainerError.malformedResponse }
 
         return card.skip ? nil : card
+    }
+
+    // MARK: - Lote
+
+    private struct ChunkResult: Sendable {
+        var cards: [Utterance.ID: Card] = [:]
+        var summary: [String] = []
+        var failures: [BatchFailure] = []
+    }
+
+    public func explainBatch(_ utterances: [Utterance]) async throws -> BatchOutcome {
+        guard !utterances.isEmpty else {
+            return BatchOutcome(cards: [:], summary: [], failures: [])
+        }
+
+        let size = ClaudeRequestBuilder.chunkSize
+        let chunks = stride(from: 0, to: utterances.count, by: size).map {
+            Array(utterances[$0 ..< min($0 + size, utterances.count)])
+        }
+        // Se construyen todas las peticiones antes de mandar ninguna: así una
+        // clave ausente falla limpio y sin haber tocado la red.
+        let requests = try chunks.map { try builder.makeBatchRequest(for: $0, apiKey: apiKey) }
+
+        // Los trozos van en paralelo, pero el resumen se recompone en orden:
+        // leerlo desordenado sería leer la sesión al revés.
+        let results = await withTaskGroup(of: (Int, ChunkResult).self) { group in
+            for (position, chunk) in chunks.enumerated() {
+                group.addTask { (position, await run(requests[position], for: chunk)) }
+            }
+            var collected: [(Int, ChunkResult)] = []
+            for await item in group { collected.append(item) }
+            return collected.sorted { $0.0 < $1.0 }.map(\.1)
+        }
+
+        var cards: [Utterance.ID: Card] = [:]
+        var summary: [String] = []
+        var failures: [BatchFailure] = []
+        for result in results {
+            cards.merge(result.cards) { current, _ in current }
+            summary += result.summary
+            failures += result.failures
+        }
+        return BatchOutcome(cards: cards, summary: summary, failures: failures)
+    }
+
+    /// Un trozo nunca lanza: lo que falla vuelve como `failures` para que el
+    /// resto del lote llegue igual. Perder veinte frases porque una petición
+    /// se cayó sería exactamente lo que el modo lote intenta evitar.
+    private func run(_ request: URLRequest, for chunk: [Utterance]) async -> ChunkResult {
+        func allFailed(_ error: ExplainerError) -> ChunkResult {
+            ChunkResult(failures: chunk.map { BatchFailure(utterance: $0, error: error) })
+        }
+
+        let json: String
+        do {
+            json = try await streamJSON(request)
+        } catch let error as ExplainerError {
+            return allFailed(error)
+        } catch {
+            return allFailed(.network(error.localizedDescription))
+        }
+
+        guard let data = json.data(using: .utf8),
+              let response = try? JSONDecoder().decode(BatchResponse.self, from: data)
+        else { return allFailed(.malformedResponse) }
+
+        var result = ChunkResult(summary: response.summary)
+        var answered = Set<Int>()
+        for entry in response.cards {
+            // Un índice fuera de rango no es de este trozo: se ignora en vez de
+            // emparejarlo con la frase equivocada.
+            guard chunk.indices.contains(entry.index - 1) else { continue }
+            answered.insert(entry.index)
+            guard !entry.skip else { continue }
+            result.cards[chunk[entry.index - 1].id] = entry.card
+        }
+        // Lo que el modelo no contestó no se da por perdido: se reporta.
+        result.failures = chunk.enumerated()
+            .filter { !answered.contains($0.offset + 1) }
+            .map { BatchFailure(utterance: $0.element, error: .malformedResponse) }
+        return result
+    }
+}
+
+// MARK: - Captura
+
+extension ClaudeExplainer: CaptureExplainer {
+    public func explainCapture(_ capture: Capture,
+                               forcing kind: CaptureKind?) async throws -> CaptureCard {
+        let request = try builder.makeCaptureRequest(for: capture, forcing: kind, apiKey: apiKey)
+        let json = try await streamJSON(request)
+
+        guard let data = json.data(using: .utf8),
+              let card = try? JSONDecoder().decode(CaptureCard.self, from: data)
+        else { throw ExplainerError.malformedResponse }
+
+        return card
     }
 }

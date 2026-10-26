@@ -4,6 +4,9 @@ public enum PipelineOutput: Sendable {
     case partial(String)
     case card(Utterance, Card)
     case failure(Utterance, ExplainerError)
+    /// Frase cerrada y sin explicar, en modo diferido. La explicación la pide
+    /// quien consume, cuando quiera.
+    case pending(Utterance)
 }
 
 /// Une transcripción, segmentación y explicación.
@@ -12,6 +15,14 @@ public enum PipelineOutput: Sendable {
 /// Por eso las tarjetas pueden llegar desordenadas y quien las muestre debe
 /// ordenar por `Utterance.startedAt`.
 public struct SessionPipeline: Sendable {
+
+    public enum Mode: Sendable, Equatable {
+        /// Una petición por frase, en cuanto se cierra.
+        case immediate
+        /// No se llama al modelo: cada frase cerrada sale por `.pending` y se
+        /// acumula hasta que alguien pide el lote.
+        case deferred
+    }
 
     /// Lo que consume el bucle: eventos del transcriptor y latidos del reloj,
     /// fundidos en una sola secuencia para que el segmentador siga siendo un
@@ -23,6 +34,7 @@ public struct SessionPipeline: Sendable {
 
     private let transcriber: any Transcriber
     private let explainer: any Explainer
+    private let mode: Mode
     private let segmenterConfig: UtteranceSegmenter.Config
     /// Cada cuánto se comprueba el silencio. `nil` desactiva el reloj: los tests
     /// que usan horas fijas lo apagan para no mezclar tiempo real con simulado.
@@ -30,10 +42,12 @@ public struct SessionPipeline: Sendable {
 
     public init(transcriber: any Transcriber,
                 explainer: any Explainer,
+                mode: Mode = .immediate,
                 segmenterConfig: UtteranceSegmenter.Config = .init(),
                 tickInterval: Duration? = .milliseconds(200)) {
         self.transcriber = transcriber
         self.explainer = explainer
+        self.mode = mode
         self.segmenterConfig = segmenterConfig
         self.tickInterval = tickInterval
     }
@@ -67,7 +81,7 @@ public struct SessionPipeline: Sendable {
                         switch beat {
                         case .tick(let time):
                             if let closed = segmenter.tick(at: time) {
-                                explain(closed, in: &group, into: continuation)
+                                close(closed, in: &group, into: continuation)
                             }
                         case .event(let event, let time):
                             if case .partial(let text) = event {
@@ -75,17 +89,17 @@ public struct SessionPipeline: Sendable {
                             }
                             // Un evento nuevo puede cerrar la frase anterior por silencio,
                             if let closed = segmenter.tick(at: time) {
-                                explain(closed, in: &group, into: continuation)
+                                close(closed, in: &group, into: continuation)
                             }
                             // y además abre o extiende la actual.
                             if let closed = segmenter.ingest(event, at: time) {
-                                explain(closed, in: &group, into: continuation)
+                                close(closed, in: &group, into: continuation)
                             }
                         }
                     }
                     // Fin del audio: cierra lo que quede pendiente.
                     if let closed = segmenter.tick(at: .distantFuture) {
-                        explain(closed, in: &group, into: continuation)
+                        close(closed, in: &group, into: continuation)
                     }
                     await group.waitForAll()
                 }
@@ -97,9 +111,13 @@ public struct SessionPipeline: Sendable {
         }
     }
 
-    private func explain(_ utterance: Utterance,
-                         in group: inout TaskGroup<Void>,
-                         into continuation: AsyncStream<PipelineOutput>.Continuation) {
+    private func close(_ utterance: Utterance,
+                       in group: inout TaskGroup<Void>,
+                       into continuation: AsyncStream<PipelineOutput>.Continuation) {
+        guard mode == .immediate else {
+            continuation.yield(.pending(utterance))
+            return
+        }
         let explainer = self.explainer
         group.addTask {
             do {

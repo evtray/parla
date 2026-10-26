@@ -13,22 +13,36 @@ struct ParlaApp: App {
         KeyboardShortcuts.onKeyUp(for: .toggleListening) {
             Task { @MainActor in state.toggleListening() }
         }
+        KeyboardShortcuts.onKeyUp(for: .captureScreen) {
+            Task { @MainActor in state.captureScreen() }
+        }
+        KeyboardShortcuts.onKeyUp(for: .toggleSubtitles) {
+            Task { @MainActor in state.toggleSubtitles() }
+        }
 
-        // Afordancia de desarrollo: PARLA_AUTOSTART=1 enciende la escucha al
-        // arrancar, para poder probar el pipeline desde la terminal sin clicar.
+        #if DEBUG
+        // Afordancias de desarrollo, solo en Debug: PARLA_AUTOSTART=1 enciende la
+        // escucha al arrancar y PARLA_SUBTITLES_AUTOSTART=1 los subtítulos, para
+        // probar desde la terminal sin clicar.
+        if ProcessInfo.processInfo.environment["PARLA_SUBTITLES_AUTOSTART"] == "1" {
+            Task { @MainActor in state.toggleSubtitles() }
+        }
         if ProcessInfo.processInfo.environment["PARLA_AUTOSTART"] == "1" {
             Task { @MainActor in state.toggleListening() }
         }
+        Task { @MainActor in DebugHooks.install() }
+        #endif
     }
 
     var body: some Scene {
         MenuBarExtra {
             MenuBarView(state: state)
         } label: {
-            Image(systemName: state.isListening ? "mic.fill" : "mic")
+            Image(systemName: state.isSubtitling ? "captions.bubble.fill"
+                  : state.isListening ? "mic.fill" : "mic")
         }
 
-        Settings { SettingsView() }
+        Settings { SettingsView(state: state) }
 
         Window("Historial", id: "history") { HistoryView() }
             .modelContainer(Persistence.container)
@@ -38,6 +52,18 @@ struct ParlaApp: App {
 struct MenuBarView: View {
     @Bindable var state: AppState
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.openSettings) private var openSettings
+
+    /// Parla vive en la barra de menús y nunca es la app activa. Sin activarla,
+    /// sus ventanas se abren sin foco y detrás de las de la app en uso, que es
+    /// lo mismo que no abrirse.
+    ///
+    /// `activate()` a secas no sirve: es cooperativa, y macOS la ignora cuando
+    /// quien la pide no es ya la app en uso.
+    private func inFront(_ open: () -> Void) {
+        NSApp.activate(ignoringOtherApps: true)
+        open()
+    }
 
     var body: some View {
         if let error = state.setupError {
@@ -46,9 +72,22 @@ struct MenuBarView: View {
         Button(state.isListening ? "Detener escucha" : "Empezar a escuchar") {
             state.toggleListening()
         }
+        Button("Capturar pantalla") { state.captureScreen() }
+        Button(state.isSubtitling ? "Ocultar subtítulos" : "Mostrar subtítulos") {
+            state.toggleSubtitles()
+        }
+        if state.mode == .batch, !state.pending.isEmpty {
+            Button(state.pending.count == 1
+                   ? "Traducir 1 frase"
+                   : "Traducir \(state.pending.count) frases") {
+                state.sendBatch()
+            }
+            .disabled(state.isSendingBatch)
+        }
         Divider()
-        Button("Historial…") { openWindow(id: "history") }
-        SettingsLink { Text("Ajustes…") }
+        Button("Historial…") { inFront { openWindow(id: "history") } }
+        Button("Ajustes…") { inFront { openSettings() } }
+            .keyboardShortcut(",", modifiers: .command)
         Divider()
         Button("Salir") { NSApplication.shared.terminate(nil) }
     }

@@ -23,9 +23,9 @@ private let utterance = Utterance(text: "necesito que me avises cuando llegues",
     #expect(request.value(forHTTPHeaderField: "content-type") == "application/json")
 }
 
-@Test func pideOpus5ConEsfuerzoBajoYStreaming() throws {
+@Test func pideOpus55ConEsfuerzoBajoYStreaming() throws {
     let json = try body(of: ClaudeRequestBuilder().makeRequest(for: utterance, apiKey: "k"))
-    #expect(json["model"] as? String == "claude-opus-5")
+    #expect(json["model"] as? String == "claude-opus-5-5")
     #expect(json["stream"] as? Bool == true)
     #expect(json["fallbacks"] as? String == "default")
     let output = try #require(json["output_config"] as? [String: Any])
@@ -81,4 +81,14 @@ private let utterance = Utterance(text: "necesito que me avises cuando llegues",
     let raw = String(data: try #require(request.httpBody), encoding: .utf8) ?? ""
     #expect(!raw.contains("maxItems"))
     #expect(!raw.contains("minItems"))
+}
+
+@Test func elCuerpoSaleIgualByteAByte() throws {
+    // El esquema de salida entra en el prefijo cacheado: si sus claves cambian
+    // de orden entre peticiones, la caché del prompt no acierta nunca.
+    let builder = ClaudeRequestBuilder()
+    let first = try builder.makeRequest(for: utterance, apiKey: "k").httpBody
+    for _ in 0 ..< 5 {
+        #expect(try builder.makeRequest(for: utterance, apiKey: "k").httpBody == first)
+    }
 }

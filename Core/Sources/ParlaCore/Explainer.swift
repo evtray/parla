@@ -17,4 +17,9 @@ public enum ExplainerError: Error, Equatable, Sendable {
 public protocol Explainer: Sendable {
     /// Devuelve `nil` cuando la frase no merecía tarjeta (`skip`).
     func explain(_ utterance: Utterance) async throws -> Card?
+
+    /// Explica varias frases en una sola petición y añade los patrones que se
+    /// repiten entre ellas. Lanza solo si ni siquiera se puede intentar (falta
+    /// la clave); lo que falle a mitad de camino viaja en `failures`.
+    func explainBatch(_ utterances: [Utterance]) async throws -> BatchOutcome
 }

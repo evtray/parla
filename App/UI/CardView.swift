@@ -7,28 +7,21 @@ struct CardView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("«\(presentation.utterance.text)»")
+            Text("«\(presentation.utterance?.text ?? "")»")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
             switch presentation.state {
-            case .pending:            skeleton
+            case .pending:            CardSkeleton()
             case .ready(let card):    ready(card)
             case .failed(let error):  failed(error)
+            // Una tarjeta de voz nunca recibe una de captura.
+            case .readyCapture:       EmptyView()
             }
         }
         .padding(14)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
-    }
-
-    private var skeleton: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            RoundedRectangle(cornerRadius: 4).frame(height: 22)
-            RoundedRectangle(cornerRadius: 4).frame(height: 12).padding(.trailing, 60)
-        }
-        .foregroundStyle(.quaternary)
-        .redacted(reason: .placeholder)
     }
 
     private func ready(_ card: Card) -> some View {
@@ -38,27 +31,9 @@ struct CardView: View {
                 .textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)
 
-            VStack(alignment: .leading, spacing: 6) {
-                ForEach(Array(card.why.enumerated()), id: \.offset) { _, line in
-                    HStack(alignment: .firstTextBaseline, spacing: 6) {
-                        Text("•")
-                        Text(line).font(.callout).fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-            }
+            WhyList(lines: card.why)
 
-            if !card.vocab.isEmpty {
-                HStack(spacing: 6) {
-                    ForEach(Array(card.vocab.enumerated()), id: \.offset) { _, term in
-                        Text(term.term)
-                            .font(.caption.weight(.medium))
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(.tint.opacity(0.15), in: Capsule())
-                            .help(term.meaning)
-                    }
-                }
-            }
+            if !card.vocab.isEmpty { VocabChips(vocab: card.vocab) }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

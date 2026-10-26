@@ -1,4 +1,5 @@
 import Foundation
+import Testing
 @testable import ParlaCore
 
 /// Devuelve un guion fijo de líneas SSE, sin red y sin esperas.
@@ -32,6 +33,28 @@ struct FakeExplainer: Explainer {
 
     func explain(_ utterance: Utterance) async throws -> Card? {
         try result.get()
+    }
+
+    func explainBatch(_ utterances: [Utterance]) async throws -> BatchOutcome {
+        guard let card = try result.get() else {
+            return BatchOutcome(cards: [:], summary: [], failures: [])
+        }
+        return BatchOutcome(cards: utterances.reduce(into: [:]) { $0[$1.id] = card },
+                            summary: [],
+                            failures: [])
+    }
+}
+
+/// Falla si alguien lo llama. Sirve para afirmar que **no** se llama.
+struct ExplodingExplainer: Explainer {
+    func explain(_ utterance: Utterance) async throws -> Card? {
+        Issue.record("el pipeline llamó al modelo cuando no debía")
+        return nil
+    }
+
+    func explainBatch(_ utterances: [Utterance]) async throws -> BatchOutcome {
+        Issue.record("el pipeline pidió un lote cuando no debía")
+        return BatchOutcome(cards: [:], summary: [], failures: [])
     }
 }
 
@@ -84,4 +107,41 @@ struct OpenEndedTranscriber: Transcriber {
 
     func start() async throws {}
     func stop() async {}
+}
+
+/// Responde en función de lo que se le pide, no del orden en que llega: los
+/// trozos de un lote viajan en paralelo y el orden de llegada no es estable.
+/// Guarda las peticiones para poder afirmar cuántas y con qué contenido.
+final class ScriptedStreamer: HTTPStreamer, @unchecked Sendable {
+    private let respond: @Sendable (URLRequest) -> (status: Int, lines: [String])
+    private let lock = NSLock()
+    private var recorded: [URLRequest] = []
+
+    var requests: [URLRequest] { lock.withLock { recorded } }
+
+    init(respond: @escaping @Sendable (URLRequest) -> (status: Int, lines: [String])) {
+        self.respond = respond
+    }
+
+    func stream(_ request: URLRequest) async throws -> HTTPStreamResponse {
+        lock.withLock { recorded.append(request) }
+        let (status, lines) = respond(request)
+        return HTTPStreamResponse(
+            statusCode: status,
+            lines: AsyncThrowingStream { continuation in
+                for line in lines { continuation.yield(line) }
+                continuation.finish()
+            }
+        )
+    }
+}
+
+/// El texto que se le manda al modelo, extraído del cuerpo de la petición.
+func userContent(of request: URLRequest) -> String {
+    guard let data = request.httpBody,
+          let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+          let messages = root["messages"] as? [[String: Any]],
+          let content = messages.first?["content"] as? String
+    else { return "" }
+    return content
 }

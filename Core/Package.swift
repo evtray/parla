@@ -9,6 +9,9 @@ let package = Package(
     ],
     targets: [
         .target(name: "ParlaCore"),
+        // `make eval-capture`: manda las capturas de muestra a la API real. Gasta
+        // tokens, por eso no es un test.
+        .executableTarget(name: "parla-eval", dependencies: ["ParlaCore"]),
         .testTarget(name: "ParlaCoreTests", dependencies: ["ParlaCore"]),
     ]
 )

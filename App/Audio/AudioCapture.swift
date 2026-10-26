@@ -1,4 +1,6 @@
+import AudioToolbox
 import AVFoundation
+import CoreAudio
 import Observation
 
 /// Transporta un buffer de audio entre el hilo de captura y el consumidor.
@@ -23,7 +25,18 @@ final class AudioCapture {
 
     /// Nombre del dispositivo de entrada, para poder decir cuál está mudo.
     var inputDeviceName: String {
-        AVCaptureDevice.default(for: .audio)?.localizedName ?? "el micrófono"
+        forcedInputName
+            ?? AVCaptureDevice.default(for: .audio)?.localizedName
+            ?? "el micrófono"
+    }
+
+    /// UID del micrófono elegido en Ajustes; `nil` deja el del sistema.
+    private let preferredInputUID: String?
+    /// El micro que se fijó a mano en el nodo de entrada, si se fijó alguno.
+    private var forcedInputName: String?
+
+    init(preferredInputUID: String? = nil) {
+        self.preferredInputUID = preferredInputUID
     }
 
     /// `false` si el motor lleva más de 3 s sin recibir audio.
@@ -85,6 +98,9 @@ final class AudioCapture {
     private func installTap(outputFormat: AVAudioFormat) throws {
         removeTapAndStop()
         let input = engine.inputNode
+        // Antes de leer el formato: el formato es el del dispositivo, y leído
+        // primero sería el del micro anterior.
+        selectInputDevice(on: input)
         let inputFormat = input.outputFormat(forBus: 0)
         let converter = AVAudioConverter(from: inputFormat, to: outputFormat)
         self.converter = converter
@@ -97,7 +113,7 @@ final class AudioCapture {
         // ve que no está en el hilo principal y aborta con SIGTRAP.
         let tap: AVAudioNodeTapBlock = { @Sendable [weak self] buffer, _ in
             let rms = Self.rms(of: buffer)
-            if let converted = Self.convert(buffer, to: outputFormat, using: converter) {
+            if let converted = AudioConversion.convert(buffer, to: outputFormat, using: converter) {
                 continuation?.yield(AudioChunk(buffer: converted))
             }
             Task { @MainActor in
@@ -109,34 +125,49 @@ final class AudioCapture {
         input.installTap(onBus: 0, bufferSize: 4096, format: inputFormat, block: tap)
         engine.prepare()
         try engine.start()
-        Log.audio.info("tap instalado; entrada \(inputFormat.sampleRate) Hz "
+        Log.audio.info("tap instalado en \(inputDeviceName); "
+            + "entrada \(inputFormat.sampleRate) Hz "
             + "\(inputFormat.channelCount)ch; motor corriendo: \(engine.isRunning)")
     }
 
-    /// Puras y sin estado: corren en el hilo de audio, nunca en el principal.
-    private nonisolated static func convert(_ buffer: AVAudioPCMBuffer,
-                                to format: AVAudioFormat,
-                                using converter: AVAudioConverter?) -> AVAudioPCMBuffer? {
-        guard let converter else { return nil }
-        let ratio = format.sampleRate / buffer.format.sampleRate
-        let capacity = AVAudioFrameCount(Double(buffer.frameLength) * ratio) + 1024
-        guard let output = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: capacity) else {
-            return nil
+    /// Sin micro elegido no se toca nada y el motor sigue al del sistema, como
+    /// siempre. Con uno elegido se fija en el nodo de entrada; si ya no está
+    /// conectado se fija el del sistema de forma explícita, porque el nodo
+    /// podría seguir apuntando al que se acaba de desenchufar.
+    private func selectInputDevice(on input: AVAudioInputNode) {
+        forcedInputName = nil
+        guard let preferredInputUID else { return }
+
+        let devices = AudioDevices.all()
+        let chosen = AudioDevices.input(preferredUID: preferredInputUID, among: devices)
+        if chosen == nil {
+            Log.audio.info("el micrófono elegido no está conectado; se usa el del sistema")
         }
-        var consumed = false
-        var error: NSError?
-        converter.convert(to: output, error: &error) { _, status in
-            if consumed {
-                status.pointee = .noDataNow
-                return nil
+        guard let target = chosen?.id ?? AudioDevices.defaultInput,
+              let unit = input.audioUnit
+        else { return }
+
+        let size = UInt32(MemoryLayout<AudioDeviceID>.size)
+        var current = AudioDeviceID(kAudioObjectUnknown)
+        var currentSize = size
+        AudioUnitGetProperty(unit, kAudioOutputUnitProperty_CurrentDevice,
+                             kAudioUnitScope_Global, 0, &current, &currentSize)
+
+        // Fijar el dispositivo provoca un cambio de configuración, que vuelve a
+        // pasar por aquí: si ya es el que toca, no se toca.
+        if current != target {
+            var id = target
+            let status = AudioUnitSetProperty(unit, kAudioOutputUnitProperty_CurrentDevice,
+                                              kAudioUnitScope_Global, 0, &id, size)
+            guard status == noErr else {
+                Log.audio.error("no se pudo fijar el micrófono: OSStatus \(status)")
+                return
             }
-            consumed = true
-            status.pointee = .haveData
-            return buffer
         }
-        return error == nil && output.frameLength > 0 ? output : nil
+        forcedInputName = devices.first { $0.id == target }?.name
     }
 
+    /// Puras y sin estado: corren en el hilo de audio, nunca en el principal.
     /// Un resumen cada ~5 s: sirve para distinguir "no te oigo" de "no entiendo".
     private nonisolated static let levelReporter = LevelReporter()
 
@@ -171,5 +202,23 @@ final class LevelReporter: @unchecked Sendable {
         peak = 0; buffers = 0; lastReport = now
         lock.unlock()
         Log.audio.info("entrada: \(n) buffers en 5s, pico \(String(format: "%.3f", p))")
+    }
+}
+
+extension AudioCapture: AudioSource {
+    var displayName: String { inputDeviceName }
+
+    /// Se pide explícitamente para distinguir "denegado" de "no hay audio" y
+    /// ofrecer el botón a Ajustes del Sistema.
+    func requestAccess() async throws {
+        switch AVCaptureDevice.authorizationStatus(for: .audio) {
+        case .authorized:
+            return
+        case .notDetermined:
+            if await AVCaptureDevice.requestAccess(for: .audio) { return }
+        default:
+            break
+        }
+        throw TranscriberSetupError.microphoneDenied
     }
 }

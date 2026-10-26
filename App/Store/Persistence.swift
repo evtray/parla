@@ -9,9 +9,16 @@ import SwiftData
 enum Persistence {
     static let container: ModelContainer = {
         do {
-            return try ModelContainer(for: StoredCard.self)
+            return try makeContainer()
         } catch {
             fatalError("No se pudo abrir la base de datos local: \(error)")
         }
     }()
+
+    /// La única forma de abrir la base. Los tests de migración pasan por aquí
+    /// para probar el mismo camino que la app.
+    static func makeContainer(_ configuration: ModelConfiguration = ModelConfiguration())
+        throws -> ModelContainer {
+        try ModelContainer(for: StoredCard.self, configurations: configuration)
+    }
 }
