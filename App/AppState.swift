@@ -23,7 +23,10 @@ final class AppState {
     @ObservationIgnored private var subtitleOverlay: SubtitleOverlay?
     @ObservationIgnored private var subtitleTask: Task<Void, Never>?
     @ObservationIgnored private var subtitleEngine: SpeechTranscriberEngine?
-    @ObservationIgnored private var subtitleSpeaker: SubtitleSpeaker?
+    @ObservationIgnored private var subtitleSpeaker: Speaker?
+    /// Aparte del de los subtítulos: cada uno tiene la voz de su idioma, y
+    /// escuchar una captura no corta lo que estén leyendo.
+    @ObservationIgnored private var captureSpeaker: Speaker?
 
     /// Se persiste al cambiarlo. Apagarla calla lo que esté sonando.
     var readsSubtitlesAloud: Bool = Preferences.shared.readsSubtitlesAloud {
@@ -485,7 +488,7 @@ final class AppState {
             }
             Log.pipeline.info("subtítulos encendidos")
 
-            let speaker = SubtitleSpeaker()
+            let speaker = Speaker()
             subtitleSpeaker = speaker
             let pipeline = SubtitlePipeline(transcriber: engine, translator: LiveTranslator())
             for await output in pipeline.outputs {
@@ -615,6 +618,19 @@ final class AppState {
         guard let apiKey = KeychainStore.shared.apiKey else { return }
         presentation.forcedKind = kind
         sendCapture(presentation, apiKey: apiKey)
+    }
+
+    /// «Escuchar»: lee el inglés de la tarjeta con una voz del Mac, sin red.
+    /// Pulsarlo otra vez empieza de nuevo en lugar de encolar.
+    func hear(_ card: CaptureCard) {
+        let text = card.englishText
+        guard !text.isEmpty else { return }
+        let language = Speaker.language(of: text)
+        captureSpeaker?.stop()
+        if captureSpeaker?.language != language {
+            captureSpeaker = Speaker(language: language)
+        }
+        captureSpeaker?.say(text)
     }
 
     private func sendCapture(_ presentation: CardPresentation, apiKey: String) {

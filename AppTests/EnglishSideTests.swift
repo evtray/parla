@@ -43,3 +43,14 @@ private func card(origin: String, kind: String? = nil,
     #expect(spoken.englishText == "I don't mind.")
     #expect(spoken.otherText == "me da igual")
 }
+
+private func capture(_ kind: CaptureKind) -> CaptureCard {
+    CaptureCard(kind: kind, source: "original", result: "resultado", why: [], vocab: [])
+}
+
+@Test func escucharUnaCapturaLeeElLadoEnIngles() {
+    #expect(capture(.understand).englishText == "original")
+    #expect(capture(.translate).englishText == "resultado")
+    // En una corrección se oye la versión corregida, no el borrador.
+    #expect(capture(.correct).englishText == "resultado")
+}

@@ -5,3 +5,4 @@ DerivedData/
 Parla.xcodeproj/
 dist/
 *.profraw
+.superpowers/

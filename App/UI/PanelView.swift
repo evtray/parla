@@ -63,7 +63,8 @@ struct PanelView: View {
                     if card.capture != nil {
                         CaptureCardView(presentation: card,
                                         onRetry: { state.retry(card) },
-                                        onReclassify: { state.reclassify(card, as: $0) })
+                                        onReclassify: { state.reclassify(card, as: $0) },
+                                        onHear: { state.hear($0) })
                     } else {
                         CardView(presentation: card) { state.retry(card) }
                     }
