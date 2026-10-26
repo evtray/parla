@@ -1,5 +1,4 @@
 import SwiftUI
-import SwiftData
 import KeyboardShortcuts
 
 @main
@@ -20,6 +19,13 @@ struct ParlaApp: App {
             Task { @MainActor in state.toggleSubtitles() }
         }
 
+        // El primer momento en que se puede enseñar una ventana.
+        _ = NotificationCenter.default.addObserver(
+            forName: NSApplication.didFinishLaunchingNotification, object: nil, queue: .main
+        ) { _ in
+            MainActor.assumeIsolated { state.showWelcomeIfFirstLaunch() }
+        }
+
         #if DEBUG
         // Afordancias de desarrollo, solo en Debug: PARLA_AUTOSTART=1 enciende la
         // escucha al arrancar y PARLA_SUBTITLES_AUTOSTART=1 los subtítulos, para
@@ -36,59 +42,13 @@ struct ParlaApp: App {
 
     var body: some Scene {
         MenuBarExtra {
-            MenuBarView(state: state)
+            MenuBarPopover(state: state)
+                .modelContainer(Persistence.container)
         } label: {
-            Image(systemName: state.isSubtitling ? "captions.bubble.fill"
-                  : state.isListening ? "mic.fill" : "mic")
+            // Un solo símbolo: qué modo está activo se ve en el menú emergente.
+            Image(systemName: state.isListening || state.isSubtitling
+                  ? "character.bubble.fill" : "character.bubble")
         }
-
-        Settings { SettingsView(state: state) }
-
-        Window("Historial", id: "history") { HistoryView() }
-            .modelContainer(Persistence.container)
-    }
-}
-
-struct MenuBarView: View {
-    @Bindable var state: AppState
-    @Environment(\.openWindow) private var openWindow
-    @Environment(\.openSettings) private var openSettings
-
-    /// Parla vive en la barra de menús y nunca es la app activa. Sin activarla,
-    /// sus ventanas se abren sin foco y detrás de las de la app en uso, que es
-    /// lo mismo que no abrirse.
-    ///
-    /// `activate()` a secas no sirve: es cooperativa, y macOS la ignora cuando
-    /// quien la pide no es ya la app en uso.
-    private func inFront(_ open: () -> Void) {
-        NSApp.activate(ignoringOtherApps: true)
-        open()
-    }
-
-    var body: some View {
-        if let error = state.setupError {
-            Text(error).font(.caption).foregroundStyle(.red)
-        }
-        Button(state.isListening ? "Detener escucha" : "Empezar a escuchar") {
-            state.toggleListening()
-        }
-        Button("Capturar pantalla") { state.captureScreen() }
-        Button(state.isSubtitling ? "Ocultar subtítulos" : "Mostrar subtítulos") {
-            state.toggleSubtitles()
-        }
-        if state.mode == .batch, !state.pending.isEmpty {
-            Button(state.pending.count == 1
-                   ? "Traducir 1 frase"
-                   : "Traducir \(state.pending.count) frases") {
-                state.sendBatch()
-            }
-            .disabled(state.isSendingBatch)
-        }
-        Divider()
-        Button("Historial…") { inFront { openWindow(id: "history") } }
-        Button("Ajustes…") { inFront { openSettings() } }
-            .keyboardShortcut(",", modifiers: .command)
-        Divider()
-        Button("Salir") { NSApplication.shared.terminate(nil) }
+        .menuBarExtraStyle(.window)
     }
 }

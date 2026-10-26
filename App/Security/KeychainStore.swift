@@ -45,4 +45,21 @@ struct KeychainStore: Sendable {
             SecItemAdd(insert as CFDictionary, nil)
         }
     }
+
+    /// Si hay clave, sin leerla. La consulta no pide los datos del elemento,
+    /// así que el Llavero no tiene que abrirlo ni pedir la contraseña aunque la
+    /// app se haya vuelto a firmar. Cualquier fallo cuenta como «no hay clave».
+    var hasAPIKey: Bool {
+        #if DEBUG
+        if let override = ProcessInfo.processInfo.environment["PARLA_API_KEY"],
+           !override.isEmpty { return true }
+        #endif
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+        ]
+        return SecItemCopyMatching(query as CFDictionary, nil) == errSecSuccess
+    }
 }

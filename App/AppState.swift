@@ -2,6 +2,7 @@ import AppKit
 import Foundation
 import Observation
 import SwiftData
+import SwiftUI
 import ParlaCore
 
 @MainActor
@@ -11,20 +12,13 @@ final class AppState {
     private(set) var isListening = false
     private(set) var partialText = ""
     private(set) var setupError: String?
-    private(set) var needsMicrophoneAccess = false
     private(set) var downloadProgress: Double?
     /// Mensaje visible cuando el dispositivo de entrada no entrega audio.
     private(set) var silentInputWarning: String?
     private(set) var cards: [CardPresentation] = []
 
-    /// Sin el permiso de Grabación de pantalla no se captura. macOS no lo
-    /// aplica hasta que la app se reabre, y el aviso lo dice.
-    private(set) var needsScreenRecordingAccess = false
     private(set) var captureError: String?
     private(set) var isSubtitling = false
-    /// Los idiomas de traducción no están descargados: el panel ofrece el
-    /// botón a Ajustes, porque la banda no se puede pulsar.
-    private(set) var needsTranslationLanguages = false
     @ObservationIgnored let subtitleModel = SubtitleModel()
     @ObservationIgnored private var subtitleOverlay: SubtitleOverlay?
     @ObservationIgnored private var subtitleTask: Task<Void, Never>?
@@ -57,6 +51,81 @@ final class AppState {
     }
 
     let audioDevices = AudioDeviceMonitor()
+
+    /// Qué falta por preparar. Lo leen la bienvenida, el menú emergente,
+    /// Estudio y el panel.
+    let setup = SetupMonitor(sources: LiveSetupSources())
+
+    /// El modo que se intentó arrancar sin tener lo que necesita. El panel y el
+    /// menú emergente enseñan primero sus pendientes.
+    private(set) var blockedMode: ParlaMode?
+
+    /// Los pendientes del modo bloqueado, con su arreglo.
+    var panelIssues: [SetupIssue] {
+        blockedMode.map { setup.status.blockers(for: $0) } ?? []
+    }
+
+    /// Los errores de esta sesión, en el orden en que se enseñan.
+    var runtimeNotices: [RuntimeNotice] {
+        [setupError.map(RuntimeNotice.setup),
+         captureError.map(RuntimeNotice.capture),
+         silentInputWarning.map(RuntimeNotice.silentInput),
+         batchError.map(RuntimeNotice.batch)]
+            .compactMap { $0 }
+    }
+
+    func dismiss(_ notice: RuntimeNotice) {
+        switch notice {
+        case .setup: setupError = nil
+        case .capture: captureError = nil
+        case .silentInput: silentInputWarning = nil
+        case .batch: batchError = nil
+        }
+    }
+
+    /// Lo que se arregla fuera de Parla impide arrancar; pedir un permiso no,
+    /// porque el propio arranque lanza el diálogo del sistema. Lo usa el menú
+    /// emergente, que ya enseña los avisos y no necesita el panel.
+    func isBlocked(_ mode: ParlaMode) -> Bool {
+        setup.refreshNow()
+        let blocked = !setup.status.startBlockers(for: mode).isEmpty
+        blockedMode = blocked ? mode : nil
+        return blocked
+    }
+
+    /// Desde un atajo: si falta algo, el panel lo enseña con su botón.
+    private func canStart(_ mode: ParlaMode) -> Bool {
+        guard !isBlocked(mode) else {
+            showPanel()
+            return false
+        }
+        return true
+    }
+
+    /// Las ventanas de Estudio y de la bienvenida. Se crea en `init` porque su
+    /// contenido necesita a `self`.
+    @ObservationIgnored private(set) var windows: WindowCoordinator!
+
+    init() {
+        windows = WindowCoordinator(
+            studioContent: { [unowned self] router in
+                AnyView(StudioView(state: self, router: router)
+                    .modelContainer(Persistence.container))
+            },
+            welcomeContent: { [unowned self] in
+                AnyView(WelcomeView(state: self, onFinish: { [unowned self] in
+                    self.windows.closeWelcome()
+                }))
+            })
+        setup.startObserving()
+        Task { await setup.refresh() }
+    }
+
+    /// La primera vez, la bienvenida; las demás, nada.
+    func showWelcomeIfFirstLaunch() {
+        guard !Preferences.shared.hasSeenWelcome else { return }
+        windows.showWelcome()
+    }
 
     private func makeExplainer(apiKey: String) -> ClaudeExplainer {
         ClaudeExplainer(builder: model.requestBuilder, apiKey: apiKey)
@@ -104,37 +173,17 @@ final class AppState {
     @ObservationIgnored private let capturer = ScreenCapturer.live
     /// Mientras la cruz está abierta, otro atajo no abre una segunda.
     private var isSelectingRegion = false
-    /// `CGRequestScreenCaptureAccess` solo muestra el diálogo una vez por
-    /// identidad de app. Pedirlo más veces no hace nada.
-    private var askedForScreenAccess = false
 
     func toggleListening() {
         isListening ? stop() : start()
     }
 
-    /// Abre el panel de Privacidad › Micrófono directamente.
-    static func openMicrophoneSettings() {
-        let url = URL(string:
-            "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone")!
-        NSWorkspace.shared.open(url)
-    }
-
-    /// Abre el panel de Privacidad › Grabación de pantalla directamente.
-    static func openScreenRecordingSettings() {
-        let url = URL(string:
-            "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")!
-        NSWorkspace.shared.open(url)
-    }
-
-    /// Ajustes del Sistema › General › Idioma y región.
-    static func openLanguageSettings() {
-        let url = URL(string: "x-apple.systempreferences:com.apple.Localization-Settings.extension")!
-        NSWorkspace.shared.open(url)
-    }
-
     private func start() {
         // Los dos modos usan el reconocimiento de voz: uno apaga al otro.
         if isSubtitling { stopSubtitles() }
+        guard canStart(.voice) else { return }
+        // `hasAPIKey` dijo que hay clave, pero leerla puede fallar igual (se
+        // canceló el diálogo del Llavero).
         guard let apiKey = KeychainStore.shared.apiKey else {
             setupError = ExplainerError.missingAPIKey.readableMessage
             showPanel()
@@ -175,19 +224,8 @@ final class AppState {
 
             do {
                 try await engine.start()
-                needsMicrophoneAccess = false
-            } catch TranscriberSetupError.microphoneDenied {
-                needsMicrophoneAccess = true
-                setupError = "Parla necesita acceso al micrófono."
-                stop()
-                return
-            } catch TranscriberSetupError.localeUnsupported {
-                setupError = "Tu Mac no tiene un modelo de voz en español disponible."
-                stop()
-                return
             } catch {
-                setupError = String(describing: error)
-                stop()
+                voiceFailedToStart(error)
                 return
             }
 
@@ -217,6 +255,31 @@ final class AppState {
         }
     }
 
+    /// La escucha no llegó a arrancar. Lo que pasó tiene que quedar en el panel,
+    /// que es lo único que se ve si se arrancó con el atajo.
+    ///
+    /// `stop()` va primero: esconde el panel y con él olvida el modo bloqueado,
+    /// así que lo que hay que enseñar se apunta después.
+    func voiceFailedToStart(_ error: any Error) {
+        stop()
+        switch error {
+        case TranscriberSetupError.microphoneDenied:
+            setup.refreshNow()
+            blockedMode = .voice
+        case TranscriberSetupError.localeUnsupported:
+            setupError = "Tu Mac no tiene un modelo de voz en español disponible."
+        default:
+            Log.audio.error("no se pudo encender la escucha: \(error)")
+            setupError = "No se pudo encender la escucha."
+        }
+        showPanel()
+    }
+
+    /// Sin escucha en marcha, el panel siempre se puede cerrar: un aviso que se
+    /// resuelve solo, o uno descartado desde el menú emergente, lo dejaba vacío
+    /// y sin forma de cerrarlo.
+    var panelCanClose: Bool { !isListening }
+
     private func stop() {
         isListening = false
         partialText = ""
@@ -235,6 +298,7 @@ final class AppState {
     func hidePanel() {
         panel?.orderOut(nil)
         panel = nil
+        blockedMode = nil
     }
 
     private func upsert(_ utterance: Utterance, _ state: CardState) {
@@ -363,8 +427,9 @@ final class AppState {
 
     private func startSubtitles() {
         if isListening { stop() }
+        guard canStart(.subtitles) else { return }
         isSubtitling = true
-        needsTranslationLanguages = false
+        setupError = nil
         subtitleModel.notice = nil
         subtitleModel.frame = nil
         subtitleModel.isVisible = false
@@ -374,8 +439,8 @@ final class AppState {
             let readiness = await LiveTranslator.readiness()
             if let notice = LiveTranslator.notice(for: readiness) {
                 subtitleModel.notice = notice
-                needsTranslationLanguages = readiness == .needsLanguages
-                setupError = notice
+                await setup.refresh()
+                blockedMode = .subtitles
                 showPanel()
                 try? await Task.sleep(for: .seconds(6))
                 stopSubtitles()
@@ -404,18 +469,16 @@ final class AppState {
                 try await engine.start()
             } catch TranscriberSetupError.screenRecordingDenied {
                 // Igual que la captura: el diálogo del sistema, una sola vez.
-                needsScreenRecordingAccess = true
-                if !askedForScreenAccess {
-                    askedForScreenAccess = true
-                    _ = CGRequestScreenCaptureAccess()
-                }
+                setup.screenRecordingWasDenied()
+                blockedMode = .subtitles
                 showPanel()
                 stopSubtitles()
                 return
             } catch {
                 // Apagados mientras arrancaban: no es un error que enseñar.
                 guard isSubtitling, !(error is CancellationError) else { return }
-                setupError = "No se pudieron encender los subtítulos (\(error))."
+                Log.audio.error("no se pudieron encender los subtítulos: \(error)")
+                setupError = "No se pudieron encender los subtítulos."
                 showPanel()
                 stopSubtitles()
                 return
@@ -484,6 +547,7 @@ final class AppState {
     /// para luego enterarse de que falta la clave es trabajo tirado.
     func captureScreen() {
         guard !isSelectingRegion else { return }
+        guard canStart(.capture) else { return }
         guard let apiKey = KeychainStore.shared.apiKey else {
             setupError = ExplainerError.missingAPIKey.readableMessage
             showPanel()
@@ -499,21 +563,18 @@ final class AppState {
             do {
                 png = try await grabRegion()
             } catch ScreenCapturer.Failure.noPermission {
-                needsScreenRecordingAccess = true
-                if !askedForScreenAccess {
-                    askedForScreenAccess = true
-                    _ = CGRequestScreenCaptureAccess()
-                }
+                setup.screenRecordingWasDenied()
+                blockedMode = .capture
                 showPanel()
                 return
             } catch {
-                captureError = "No se pudo capturar la pantalla (\(error))."
+                Log.pipeline.error("no se pudo capturar la pantalla: \(error)")
+                captureError = "No se pudo capturar la pantalla."
                 showPanel()
                 return
             }
             // Esc: ni tarjeta, ni coste, ni mensaje.
             guard let png else { return }
-            needsScreenRecordingAccess = false
 
             let prepared: ImageDownscaler.Prepared
             do {

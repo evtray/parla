@@ -8,18 +8,30 @@ import AppKit
 @MainActor
 enum DebugHooks {
 
-    /// `PARLA_CLICK_MENU="Ajustes…"` y `PARLA_CLICK_AFTER=4`: a los 4 s ejecuta
-    /// la acción de ese ítem del menú de la barra, igual que un clic.
+    /// `PARLA_OPEN_MENU=1` y `PARLA_CLICK_AFTER=4`: a los 4 s abre el menú
+    /// emergente, igual que un clic en el icono.
+    /// `PARLA_APPEARANCE=dark` (o `light`): fuerza la apariencia de la app, para
+    /// revisar los dos modos sin tocar los ajustes del sistema.
     static func install() {
         let environment = ProcessInfo.processInfo.environment
         if environment["PARLA_PROBE_AUDIO"] == "1" { probeAudio() }
-        guard let title = environment["PARLA_CLICK_MENU"] else { return }
+        if let delays = environment["PARLA_SNAPSHOT_AFTER"] {
+            for delay in delays.split(separator: ",").compactMap({ Double($0) }) {
+                scheduleSnapshot(after: delay)
+            }
+        }
+        switch environment["PARLA_APPEARANCE"] {
+        case "dark": NSApp.appearance = NSAppearance(named: .darkAqua)
+        case "light": NSApp.appearance = NSAppearance(named: .aqua)
+        default: break
+        }
+        guard environment["PARLA_OPEN_MENU"] == "1" else { return }
         let delay = environment["PARLA_CLICK_AFTER"].flatMap(Double.init) ?? 4
 
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(delay))
             logWindows("antes")
-            clickMenuItem(titled: title)
+            openMenuBarWindow()
             // La activación es asíncrona y el usuario puede estar usando otra
             // app: una línea de tiempo distingue "nunca se activó" de "se
             // activó y perdió el foco".
@@ -53,28 +65,36 @@ enum DebugHooks {
             + "\(AudioDevices.setDefaultOutput(output))")
     }
 
-    private static func clickMenuItem(titled title: String) {
-        let statusItems = NSApp.windows
+    /// Sin activar antes la app, la ventana del menú emergente se abre y se
+    /// cierra sola, porque no llega a ser la ventana clave (sonda 1).
+    private static func openMenuBarWindow() {
+        let buttons = NSApp.windows
             .filter { $0.className.contains("StatusBar") }
-            .compactMap { $0.value(forKey: "statusItem") as? NSStatusItem }
-        Log.pipeline.info("hook: \(statusItems.count) ítem(s) de barra")
+            .compactMap { ($0.value(forKey: "statusItem") as? NSStatusItem)?.button }
+        Log.pipeline.info("hook: \(buttons.count) botón(es) de barra")
+        NSApp.activate(ignoringOtherApps: true)
+        buttons.forEach { $0.performClick(nil) }
+    }
 
-        for statusItem in statusItems {
-            guard let menu = statusItem.menu else {
-                Log.pipeline.info("hook: el ítem de barra no tiene menú")
-                continue
+    /// `PARLA_SNAPSHOT_AFTER=3,8`: a los 3 s y a los 8 s guarda una imagen de
+    /// cada ventana visible de Parla en el `tmp` del contenedor. Las capturas de
+    /// pantalla de fuera no ven una app de la barra de menús; la app sí puede
+    /// dibujarse a sí misma, sin permiso de Grabación de pantalla.
+    private static func scheduleSnapshot(after delay: Double) {
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(delay))
+            let folder = FileManager.default.temporaryDirectory.appending(path: "parla-snapshots")
+            try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            for (index, window) in NSApp.windows.enumerated() where window.isVisible {
+                guard let view = window.contentView?.superview ?? window.contentView,
+                      let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds)
+                else { continue }
+                view.cacheDisplay(in: view.bounds, to: rep)
+                let file = folder.appending(path: "\(Int(delay * 10))-\(index)-\(window.className).png")
+                try? rep.representation(using: .png, properties: [:])?.write(to: file)
+                Log.pipeline.info("hook: instantánea \(file.path)")
             }
-            menu.delegate?.menuNeedsUpdate?(menu)
-            menu.update()
-            let titles = menu.items.map { "\($0.title)[\($0.isEnabled ? "on" : "off")]" }
-            Log.pipeline.info("hook: menú = \(titles.joined(separator: " | "))")
-
-            guard let index = menu.items.firstIndex(where: { $0.title == title }) else {
-                Log.pipeline.error("hook: no hay ítem «\(title)»")
-                continue
-            }
-            Log.pipeline.info("hook: activa=\(NSApp.isActive) → ejecuta «\(title)»")
-            menu.performActionForItem(at: index)
+            logWindows("instantánea a los \(delay) s")
         }
     }
 

@@ -25,32 +25,10 @@ struct PanelView: View {
                         .lineLimit(2)
                 }
 
-                if state.needsMicrophoneAccess {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Parla necesita acceso al micrófono.").font(.callout)
-                        Button("Abrir Ajustes del Sistema") {
-                            AppState.openMicrophoneSettings()
-                        }
-                        .controlSize(.small)
+                ForEach(state.panelIssues) { issue in
+                    SetupIssueRow(issue: issue, setup: state.setup) {
+                        state.windows.showStudio(.settings)
                     }
-                }
-
-                if state.needsScreenRecordingAccess {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Parla necesita permiso de Grabación de pantalla. Después de "
-                             + "darlo, cierra Parla y vuelve a abrirla: macOS no lo aplica antes.")
-                            .font(.callout)
-                            .fixedSize(horizontal: false, vertical: true)
-                        Button("Abrir Ajustes del Sistema") {
-                            AppState.openScreenRecordingSettings()
-                        }
-                        .controlSize(.small)
-                    }
-                }
-
-                if state.needsTranslationLanguages {
-                    Button("Abrir Idioma y región") { AppState.openLanguageSettings() }
-                        .controlSize(.small)
                 }
 
                 if let error = state.captureError {
@@ -91,10 +69,7 @@ struct PanelView: View {
                     }
                 }
 
-                if !state.isListening
-                    && (!state.visibleCards.isEmpty
-                        || state.needsScreenRecordingAccess
-                        || state.captureError != nil) {
+                if state.panelCanClose {
                     Button("Cerrar el panel") { state.hidePanel() }
                         .buttonStyle(.link)
                         .font(.caption)

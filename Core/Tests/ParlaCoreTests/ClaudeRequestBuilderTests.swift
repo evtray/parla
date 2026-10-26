@@ -92,3 +92,13 @@ private let utterance = Utterance(text: "necesito que me avises cuando llegues",
         #expect(try builder.makeRequest(for: utterance, apiKey: "k").httpBody == first)
     }
 }
+
+@Test func laPeticionDeModelosEsUnGETSinCosteConTiempoLimite() {
+    let request = ClaudeRequestBuilder.makeModelsRequest(apiKey: "sk-test")
+    #expect(request.url?.absoluteString == "https://api.anthropic.com/v1/models?limit=1")
+    #expect(request.httpMethod == "GET")
+    #expect(request.value(forHTTPHeaderField: "x-api-key") == "sk-test")
+    #expect(request.value(forHTTPHeaderField: "anthropic-version") == "2023-06-01")
+    #expect(request.timeoutInterval == 10)
+    #expect(request.httpBody == nil)
+}

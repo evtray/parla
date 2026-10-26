@@ -70,3 +70,30 @@ private func withScratchDefaults(_ body: (UserDefaults) throws -> Void) rethrows
         #expect(!Preferences(defaults: defaults).readsSubtitlesAloud)
     }
 }
+
+@Test func laBienvenidaNoSeHaVistoAlEmpezar() {
+    withScratchDefaults { defaults in
+        #expect(!Preferences(defaults: defaults).hasSeenWelcome)
+    }
+}
+
+@Test func haberVistoLaBienvenidaSobreviveAReabrir() {
+    withScratchDefaults { defaults in
+        Preferences(defaults: defaults).hasSeenWelcome = true
+        #expect(Preferences(defaults: defaults).hasSeenWelcome)
+    }
+}
+
+@Test func laPantallaNoSeHaPedidoAlEmpezar() {
+    withScratchDefaults { defaults in
+        #expect(!Preferences(defaults: defaults).screenRecordingRequested)
+    }
+}
+
+@Test func haberPedidoLaPantallaSobreviveAReabrir() {
+    // macOS solo enseña su diálogo una vez por app: volver a pedirlo no hace nada.
+    withScratchDefaults { defaults in
+        Preferences(defaults: defaults).screenRecordingRequested = true
+        #expect(Preferences(defaults: defaults).screenRecordingRequested)
+    }
+}

@@ -33,3 +33,26 @@ import ParlaCore
     #expect(stored.first?.why.isEmpty == true)
     #expect(stored.first?.createdAt == Date(timeIntervalSince1970: 5))
 }
+
+@Test func laEstrellaSeCombinaConElModo() {
+    #expect(HistoryFilter.voice.includes(origin: "voice", isFavorite: true, favoritesOnly: true))
+    #expect(!HistoryFilter.voice.includes(origin: "voice", isFavorite: false, favoritesOnly: true))
+    #expect(!HistoryFilter.voice.includes(origin: "screen", isFavorite: true, favoritesOnly: true))
+    #expect(HistoryFilter.all.includes(origin: "system", isFavorite: true, favoritesOnly: true))
+    #expect(HistoryFilter.all.includes(origin: "system", isFavorite: false, favoritesOnly: false))
+}
+
+@Test func cadaOrigenTieneSuIconoYSuNombre() {
+    #expect(CardOriginStyle.symbol(origin: "voice") == "mic")
+    #expect(CardOriginStyle.symbol(origin: "screen") == "crop")
+    #expect(CardOriginStyle.symbol(origin: "system") == "captions.bubble")
+    #expect(CardOriginStyle.name(origin: "voice", kind: nil) == "Voz")
+    #expect(CardOriginStyle.name(origin: "system", kind: nil) == "Subtítulos")
+    #expect(CardOriginStyle.name(origin: "screen", kind: "correct") == "Corrección")
+    #expect(CardOriginStyle.name(origin: "screen", kind: nil) == "Captura")
+}
+
+@Test func losCasosDeCapturaTienenNombreSinIcono() {
+    #expect(CaptureKind.allCases.map(\.title)
+            == ["Para entender", "Corrección", "Traducción", "Sin texto"])
+}

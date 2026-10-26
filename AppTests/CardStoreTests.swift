@@ -90,3 +90,37 @@ private func captureCard(_ kind: CaptureKind) -> CaptureCard {
                      card: CaptureCard(kind: .skip, source: "", result: "", why: [], vocab: []))
     #expect(try ModelContext(container).fetch(FetchDescriptor<StoredCard>()).isEmpty)
 }
+
+@Test func borrarUnaTarjetaBorraSuVocabulario() throws {
+    let container = try ModelContainer(
+        for: StoredCard.self,
+        configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+    let context = ModelContext(container)
+    context.insert(StoredCard(id: UUID(), source: "me da igual", result: "I don't mind.",
+                              why: [], createdAt: Date(),
+                              vocab: [StoredVocab(term: "mind", meaning: "importar")]))
+    try context.save()
+
+    let card = try #require(try context.fetch(FetchDescriptor<StoredCard>()).first)
+    context.delete(card)
+    try context.save()
+
+    #expect(try context.fetch(FetchDescriptor<StoredCard>()).isEmpty)
+    #expect(try context.fetch(FetchDescriptor<StoredVocab>()).isEmpty)
+}
+
+@Test func marcarFavoritaSobreviveAGuardar() throws {
+    let container = try ModelContainer(
+        for: StoredCard.self,
+        configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+    let context = ModelContext(container)
+    let card = StoredCard(id: UUID(), source: "hola", result: "hello", why: [],
+                          createdAt: Date(), vocab: [])
+    context.insert(card)
+    #expect(!card.isFavorite)
+    card.isFavorite = true
+    try context.save()
+
+    let fresh = ModelContext(container)
+    #expect(try fresh.fetch(FetchDescriptor<StoredCard>()).first?.isFavorite == true)
+}
