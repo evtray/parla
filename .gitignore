@@ -4,3 +4,4 @@ DerivedData/
 *.xcodeproj
 Parla.xcodeproj/
 dist/
+*.profraw
