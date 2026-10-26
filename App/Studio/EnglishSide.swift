@@ -52,3 +52,10 @@ enum CardOriginStyle {
         }
     }
 }
+
+extension CaptureCard {
+    /// Lo que lee «Escuchar»: el mismo lado que copia el historial.
+    var englishText: String {
+        EnglishSide(origin: "screen", kind: kind.rawValue) == .source ? source : result
+    }
+}

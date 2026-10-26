@@ -5,6 +5,7 @@ struct CaptureCardView: View {
     let presentation: CardPresentation
     let onRetry: () -> Void
     let onReclassify: (CaptureKind) -> Void
+    let onHear: (CaptureCard) -> Void
 
     @State private var sourceExpanded = false
 
@@ -39,7 +40,17 @@ struct CaptureCardView: View {
 
     private func ready(_ card: CaptureCard) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            header(card.kind.label)
+            HStack {
+                header(card.kind.label)
+                Spacer()
+                Button { onHear(card) } label: {
+                    Image(systemName: "speaker.wave.2")
+                }
+                .buttonStyle(.borderless)
+                .foregroundStyle(.secondary)
+                .help("Escuchar el inglés")
+                .accessibilityLabel("Escuchar el inglés")
+            }
 
             Text("«\(card.source)»")
                 .font(.caption)
