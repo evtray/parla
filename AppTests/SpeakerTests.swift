@@ -59,3 +59,25 @@ private func voice(_ language: String, _ quality: Int, _ id: String = "") -> Spe
 @Test func sinTextoReconocibleSuponeIngles() {
     #expect(Speaker.language(of: "") == "en")
 }
+
+@Test func nuncaEligeUnaVozDeBroma() {
+    // Bells, Boing, Bad News… son voces de broma (`isNoveltyVoice`): aunque su
+    // identificador ordene primero, gana la normal.
+    let chosen = Speaker.bestVoice(among: [
+        Speaker.VoiceOption(identifier: "com.apple.speech.synthesis.voice.Bells",
+                            language: "en-US", quality: 1, isNovelty: true),
+        Speaker.VoiceOption(identifier: "com.apple.voice.compact.en-US.Samantha",
+                            language: "en-US", quality: 1, isNovelty: false),
+    ], language: "en")
+    #expect(chosen?.identifier == "com.apple.voice.compact.en-US.Samantha")
+}
+
+@Test func prefiereLasVocesModernasALasAntiguas() {
+    // Fred, Ralph, Kathy… son las voces MacinTalk de antes
+    // (`com.apple.speech.synthesis.voice.`): con la misma calidad, gana Samantha.
+    let chosen = Speaker.bestVoice(among: [
+        voice("en-US", 1, "com.apple.speech.synthesis.voice.Fred"),
+        voice("en-US", 1, "com.apple.voice.compact.en-US.Samantha"),
+    ], language: "en")
+    #expect(chosen?.identifier == "com.apple.voice.compact.en-US.Samantha")
+}

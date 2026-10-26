@@ -17,13 +17,16 @@ final class Speaker {
         let language: String
         /// Como `AVSpeechSynthesisVoiceQuality`: 1 normal, 2 mejorada, 3 premium.
         let quality: Int
+        /// Las de broma del sistema: Bells, Boing, Bad News…
+        var isNovelty = false
     }
 
     /// Una voz de `language` (código de dos letras). En español, el acento
     /// latinoamericano primero, y si no hay, el de España; en inglés, el
     /// estadounidense. Dentro del acento, las voces estándar de Apple antes que
-    /// las de efecto (`eloquence`: Eddy, Flo, Grandma…, que suenan robóticas),
-    /// y luego la mejor calidad.
+    /// las de efecto (`eloquence`: Eddy, Flo, Grandma…, que suenan robóticas) y
+    /// las de broma, luego la mejor calidad y, a igualdad, las modernas antes
+    /// que las MacinTalk antiguas.
     nonisolated static func bestVoice(among voices: [VoiceOption],
                                       language: String = "es") -> VoiceOption? {
         func preferredAccent(_ voice: VoiceOption) -> Bool {
@@ -33,10 +36,12 @@ final class Speaker {
             default: true
             }
         }
-        func rank(_ voice: VoiceOption) -> (Int, Int, Int) {
+        func rank(_ voice: VoiceOption) -> (Int, Int, Int, Int) {
             (preferredAccent(voice) ? 1 : 0,
-             voice.identifier.contains(".eloquence.") ? 0 : 1,
-             voice.quality)
+             voice.isNovelty || voice.identifier.contains(".eloquence.") ? 0 : 1,
+             voice.quality,
+             // Las MacinTalk de antes (Fred, Ralph, Kathy…) suenan más robóticas.
+             voice.identifier.hasPrefix("com.apple.speech.synthesis.voice.") ? 0 : 1)
         }
         return voices
             .filter { $0.language.hasPrefix(language) }
@@ -70,7 +75,8 @@ final class Speaker {
         self.language = language
         let options = AVSpeechSynthesisVoice.speechVoices().map {
             VoiceOption(identifier: $0.identifier, language: $0.language,
-                        quality: $0.quality.rawValue)
+                        quality: $0.quality.rawValue,
+                        isNovelty: $0.voiceTraits.contains(.isNoveltyVoice))
         }
         voice = Self.bestVoice(among: options, language: language)
             .flatMap { AVSpeechSynthesisVoice(identifier: $0.identifier) }
