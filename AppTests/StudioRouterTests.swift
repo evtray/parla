@@ -17,3 +17,11 @@ import Testing
     router.open(nil)
     #expect(router.section == .settings)
 }
+
+@Test @MainActor func abrirCuadernosCambiaLaSeccion() {
+    let router = StudioRouter()
+    router.open(.notebooks)
+    #expect(router.section == .notebooks)
+    #expect(StudioSection.notebooks.title == "Cuadernos")
+    #expect(StudioSection.notebooks.symbol == "books.vertical")
+}

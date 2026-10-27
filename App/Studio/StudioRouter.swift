@@ -1,11 +1,12 @@
 import Observation
 
 enum StudioSection: Hashable, CaseIterable {
-    case history, settings
+    case history, notebooks, settings
 
     var title: String {
         switch self {
         case .history: "Historial"
+        case .notebooks: "Cuadernos"
         case .settings: "Ajustes"
         }
     }
@@ -13,6 +14,7 @@ enum StudioSection: Hashable, CaseIterable {
     var symbol: String {
         switch self {
         case .history: "clock"
+        case .notebooks: "books.vertical"
         case .settings: "gearshape"
         }
     }

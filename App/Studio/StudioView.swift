@@ -6,7 +6,7 @@ struct StudioView: View {
     @Bindable var state: AppState
     @Bindable var router: StudioRouter
 
-    /// La lista solo lleva el Historial: Ajustes vive abajo, aparte.
+    /// La lista lleva el Historial y los Cuadernos: Ajustes vive abajo, aparte.
     private var listSelection: Binding<StudioSection?> {
         Binding(get: { router.section },
                 set: { if let section = $0 { router.section = section } })
@@ -15,8 +15,9 @@ struct StudioView: View {
     var body: some View {
         NavigationSplitView {
             List(selection: listSelection) {
-                Label(StudioSection.history.title, systemImage: StudioSection.history.symbol)
-                    .tag(StudioSection.history)
+                ForEach([StudioSection.history, .notebooks], id: \.self) { section in
+                    Label(section.title, systemImage: section.symbol).tag(section)
+                }
             }
             .safeAreaInset(edge: .bottom) {
                 SidebarFooterButton(section: .settings, router: router)
@@ -27,6 +28,7 @@ struct StudioView: View {
                 SetupBanner(setup: state.setup) { router.section = .settings }
                 switch router.section {
                 case .history: HistorySection()
+                case .notebooks: NotebooksSection(store: state.live.notebooks)
                 case .settings: SettingsSection(state: state)
                 }
             }
