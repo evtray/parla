@@ -19,6 +19,7 @@ enum Persistence {
     /// para probar el mismo camino que la app.
     static func makeContainer(_ configuration: ModelConfiguration = ModelConfiguration())
         throws -> ModelContainer {
-        try ModelContainer(for: StoredCard.self, configurations: configuration)
+        try ModelContainer(for: StoredCard.self, Notebook.self, NotebookLine.self, StoredExpression.self,
+                           configurations: configuration)
     }
 }

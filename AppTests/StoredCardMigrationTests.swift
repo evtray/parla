@@ -1,6 +1,7 @@
 import Testing
 import Foundation
 import SwiftData
+import ParlaCore
 @testable import Parla
 
 /// El esquema tal como estaba antes de la captura. Anidado en un
@@ -71,4 +72,31 @@ enum LegacySchema: VersionedSchema {
     #expect(stored.first?.kind == nil)
     #expect(stored.first?.isFavorite == false)
     #expect(stored.first?.vocab.first?.term == "either way")
+}
+
+@Test func unaBaseSinCuadernosAbreConLosModelosNuevos() throws {
+    let url = FileManager.default.temporaryDirectory
+        .appending(path: "parla-cuadernos-\(UUID().uuidString).store")
+    defer {
+        for suffix in ["", "-shm", "-wal"] {
+            try? FileManager.default.removeItem(atPath: url.path + suffix)
+        }
+    }
+
+    do {
+        let before = try ModelContainer(for: StoredCard.self,
+                                        configurations: ModelConfiguration(url: url))
+        let context = ModelContext(before)
+        context.insert(StoredCard(
+            utterance: Utterance(text: "hola", startedAt: Date(timeIntervalSince1970: 3)),
+            card: Card(english: "hello", why: [], vocab: [], skip: false)))
+        try context.save()
+    }
+
+    let current = try Persistence.makeContainer(ModelConfiguration(url: url))
+    let context = ModelContext(current)
+    #expect(try context.fetch(FetchDescriptor<StoredCard>()).first?.source == "hola")
+    context.insert(Notebook(name: "AFK Journey", about: ""))
+    try context.save()
+    #expect(try context.fetch(FetchDescriptor<Notebook>()).count == 1)
 }
