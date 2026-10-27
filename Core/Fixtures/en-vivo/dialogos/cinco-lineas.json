@@ -1,0 +1,7 @@
+{ "about": "RPG de fantasía; Maren es la capitana; Odie es un explorador bromista.",
+  "history": ["The bridge to the northern camp just collapsed."],
+  "lines": [ { "english": "We need another way across the river.", "expectSave": false, "mustMention": ["río"] },
+             { "english": "Odie, can you scout the cliffs?", "expectSave": false, "mustMention": ["acantilad", "risco", "precipicio"] },
+             { "english": "Piece of cake. Give me ten minutes.", "expectSave": true, "mustMention": ["pan comido", "fácil", "facil"] },
+             { "english": "Be careful. The mist plays tricks on you.", "expectSave": true, "mustMention": ["niebla", "bruma"] },
+             { "english": "I'll be back before you know it.", "expectSave": true, "mustMention": ["volver", "vuelvo", "regres"] } ] }

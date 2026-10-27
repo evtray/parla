@@ -1,0 +1,4 @@
+{ "about": "RPG de fantasía; Brutus es un herrero gruñón que ayuda al grupo.",
+  "history": ["Sorry, I broke your hammer again."],
+  "lines": [ { "english": "Don't sweat it, kid. I've got a dozen more.",
+               "expectSave": true, "mustMention": ["preocup"] } ] }

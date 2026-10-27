@@ -11,7 +11,7 @@ TESTFLAGS := $(if $(wildcard $(XLIBS)/lib_TestingInterop.dylib), \
   -Xlinker -rpath -Xlinker $(XFRAMEWORKS) \
   -Xlinker -rpath -Xlinker $(XLIBS),)
 
-.PHONY: test test-app eval-capture eval-ocr generate build run install release open clean
+.PHONY: test test-app eval-capture eval-ocr eval-live generate build run install release open clean
 
 test:
 	cd Core && swift test $(TESTFLAGS)
@@ -29,6 +29,11 @@ eval-capture:
 # Core/Fixtures/en-vivo/imagenes y los compara con su .txt. No usa la API.
 eval-ocr:
 	cd Core && swift run parla-eval ocr Fixtures/en-vivo/imagenes
+
+# Traduce los diálogos de Core/Fixtures/en-vivo/dialogos con Haiku 5.5 (o con
+# PARLA_MODEL). Necesita PARLA_API_KEY y gasta tokens: no es un test.
+eval-live:
+	cd Core && swift run parla-eval live Fixtures/en-vivo/dialogos
 
 generate:
 	xcodegen generate

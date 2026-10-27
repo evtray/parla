@@ -6,6 +6,8 @@ import ParlaCore
 //       al principio del nombre (correct-03-borrador.png).
 //   swift run parla-eval ocr <carpeta>                el OCR de la lectura en vivo:
 //       cada .png con su .txt al lado. No usa la API.
+//   PARLA_API_KEY=… swift run parla-eval live <carpeta>
+//       la lectura en vivo con diálogos inventados (por defecto, con Haiku 5.5).
 // PARLA_MODEL cambia el modelo (por defecto, el de la app).
 
 /// Guarda las líneas SSE de la última petición. Cuando una tarjeta falla, el
@@ -127,9 +129,15 @@ let arguments = CommandLine.arguments
 switch (arguments.count, arguments.dropFirst().first) {
 case (3, "ocr"?):
     try await evalOCR(in: arguments[2])
+case (3, "live"?):
+    guard let apiKey = ProcessInfo.processInfo.environment["PARLA_API_KEY"], !apiKey.isEmpty else {
+        print("Falta PARLA_API_KEY.")
+        exit(2)
+    }
+    try await evalLive(in: arguments[2], apiKey: apiKey)
 case (2, _):
     try await evalCaptures(in: arguments[1])
 default:
-    print("uso: parla-eval <carpeta con capturas> | parla-eval ocr <carpeta>")
+    print("uso: parla-eval <carpeta con capturas> | parla-eval ocr|live <carpeta>")
     exit(2)
 }

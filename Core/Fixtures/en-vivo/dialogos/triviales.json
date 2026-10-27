@@ -1,0 +1,4 @@
+{ "about": "RPG de fantasía.",
+  "history": [],
+  "lines": [ { "english": "Let's go!", "expectSave": false, "mustMention": ["vamos"] },
+             { "english": "Thank you.", "expectSave": false, "mustMention": ["gracias"] } ] }
