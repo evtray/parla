@@ -117,3 +117,25 @@ private func withScratchDefaults(_ body: (UserDefaults) throws -> Void) rethrows
         #expect(Preferences(defaults: defaults).model == .opus55)
     }
 }
+
+@Test func laMemoriaDeLaLecturaSobreviveAReabrir() {
+    withScratchDefaults { defaults in
+        var memory = LiveSetupMemory()
+        memory.remember(LiveSetup(source: .window(bundleID: "com.afk", title: "AFK"),
+                                  region: CGRect(x: 0.1, y: 0.7, width: 0.8, height: 0.2),
+                                  notebookID: nil))
+        Preferences(defaults: defaults).liveSetupMemory = memory
+        #expect(Preferences(defaults: defaults).liveSetupMemory == memory)
+    }
+}
+
+@Test func laVistaEmpiezaEnElPanelYElRitmoEnAutomatico() {
+    withScratchDefaults { defaults in
+        #expect(Preferences(defaults: defaults).liveDisplay == .panel)
+        #expect(Preferences(defaults: defaults).liveRhythm == .automatic)
+        Preferences(defaults: defaults).liveDisplay = .cover
+        Preferences(defaults: defaults).liveRhythm = .onDemand
+        #expect(Preferences(defaults: defaults).liveDisplay == .cover)
+        #expect(Preferences(defaults: defaults).liveRhythm == .onDemand)
+    }
+}
