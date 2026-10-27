@@ -668,6 +668,17 @@ final class AppState {
             live.stop()
             return
         }
+        beginLiveReading(fresh: false)
+    }
+
+    /// «Elegir otro recuadro…»: termina la sesión, si la hay, y pregunta todo
+    /// otra vez en vez de arrancar con lo recordado.
+    func chooseLiveRegion() {
+        live.stop()
+        beginLiveReading(fresh: true)
+    }
+
+    private func beginLiveReading(fresh: Bool) {
         guard canStart(.live) else { return }
         guard CGPreflightScreenCaptureAccess() else {
             setup.screenRecordingWasDenied()
@@ -680,7 +691,7 @@ final class AppState {
             showPanel()
             return
         }
-        Task { await live.begin(apiKey: apiKey) }
+        Task { await live.begin(apiKey: apiKey, fresh: fresh) }
     }
 
     /// ⌃⌥R: lee el recuadro ya, también en «Cuando yo diga».

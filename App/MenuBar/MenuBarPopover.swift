@@ -34,6 +34,11 @@ struct MenuBarPopover: View {
                 }
             }
 
+            Button("Elegir otro recuadro…") { chooseLiveRegion() }
+                .buttonStyle(.link)
+                .font(.caption)
+                .frame(maxWidth: .infinity, alignment: .trailing)
+
             if !notices.visible.isEmpty {
                 VStack(alignment: .leading, spacing: 10) {
                     ForEach(notices.visible) { notice in
@@ -132,6 +137,13 @@ struct MenuBarPopover: View {
             guard !state.isBlocked(.live) else { return }
             state.toggleLiveReading()
         }
+    }
+
+    /// Como la casilla apagada, pero sin arrancar con lo recordado.
+    private func chooseLiveRegion() {
+        guard !state.isBlocked(.live) else { return }
+        dismiss()
+        state.chooseLiveRegion()
     }
 
     private func open(_ section: StudioSection?) {
