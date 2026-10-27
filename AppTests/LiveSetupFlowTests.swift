@@ -44,3 +44,13 @@ private let remembered = LiveSetup(source: .window(bundleID: "com.afk", title: "
     #expect(model.nextStep == nil)
     #expect(model.setup?.source == .window(bundleID: "com.afk", title: "AFK Journey"))
 }
+
+@Test func alCambiarUnaAppRecordadaPideElRecuadroOtraVez() {
+    var model = LiveSetupFlowModel.fresh(memory: LiveSetupMemory(last: remembered,
+                                                                 byApp: ["com.afk": remembered]))
+    model.choose(window: game)
+    #expect(model.nextStep == .region)
+    model.chooseRegion(CGRect(x: 0.2, y: 0.5, width: 0.6, height: 0.3))
+    model.chooseNotebook(remembered.notebookID)
+    #expect(model.setup?.region == CGRect(x: 0.2, y: 0.5, width: 0.6, height: 0.3))
+}

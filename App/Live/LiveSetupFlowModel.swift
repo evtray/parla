@@ -11,6 +11,8 @@ struct LiveSetupFlowModel {
     private(set) var region: CGRect?
     private(set) var notebookID: UUID?
     private var notebookChosen = false
+    /// «Cambiar»: el recuadro se marca otra vez aunque la app ya tenga uno.
+    private var redrawsRegion = false
     private let memory: LiveSetupMemory
 
     /// Si lo último que se usó se puede reencontrar, se arranca sin preguntar.
@@ -30,7 +32,9 @@ struct LiveSetupFlowModel {
 
     /// Empieza de cero aunque haya algo recordado («Cambiar»).
     static func fresh(memory: LiveSetupMemory) -> LiveSetupFlowModel {
-        LiveSetupFlowModel(memory: LiveSetupMemory(byApp: memory.byApp), windows: [])
+        var flow = LiveSetupFlowModel(memory: LiveSetupMemory(byApp: memory.byApp), windows: [])
+        flow.redrawsRegion = true
+        return flow
     }
 
     var nextStep: Step? {
@@ -45,15 +49,13 @@ struct LiveSetupFlowModel {
         return LiveSetup(source: source, region: region, notebookID: notebookID)
     }
 
-    /// Una app ya usada trae su recuadro y su cuaderno: solo se confirma el cuaderno.
+    /// Una app ya usada trae su recuadro y su cuaderno: solo se confirma el
+    /// cuaderno. Con «Cambiar», el recuadro se vuelve a marcar.
     mutating func choose(window: WindowCandidate) {
         source = .window(bundleID: window.bundleID, title: window.title)
-        if let known = memory.byApp[window.bundleID] {
-            region = known.region
-            notebookID = known.notebookID
-        } else {
-            region = nil
-        }
+        let known = memory.byApp[window.bundleID]
+        region = redrawsRegion ? nil : known?.region
+        notebookID = known?.notebookID
     }
 
     mutating func chooseScreen() {
