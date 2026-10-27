@@ -125,7 +125,8 @@ final class LiveSession {
             if case .translated(let current) = line.status, !current.expressions.isEmpty {
                 translation = current
             } else {
-                let context = await store.context(notebookID: setup.notebookID, sessionID: sessionID)
+                let context = await store.context(notebookID: setup.notebookID,
+                                                  sessionID: sessionID, excluding: [id])
                 translation = try? await translator.explain(line.english, context: context)
             }
             guard let translation, let index = lines.firstIndex(where: { $0.id == id }) else {
@@ -169,9 +170,13 @@ final class LiveSession {
         case .resumed:
             if state != .stopped { state = .running }
         case .frame(let image):
-            guard state == .running else { return }
+            // Un fallo de Vision pausa, pero el siguiente fotograma se intenta
+            // leer igual: si sale bien, la lectura sigue sola.
+            let readerFailed = if case .paused(.readerFailed) = state { true } else { false }
+            guard state == .running || readerFailed else { return }
             do {
                 let text = try await read(image)
+                if readerFailed { state = .running }
                 if let line = detector.feed(text) { await add(line) }
             } catch {
                 Log.pipeline.error("lectura en vivo: Vision falló: \(error.localizedDescription)")
@@ -185,12 +190,15 @@ final class LiveSession {
     private func add(_ english: String) async {
         // Con la fuente «pantalla», el recuadro puede incluir la traducción de
         // Parla: leerla otra vez la traduciría en bucle.
+        // Vision cambia acentos y signos al leerla: basta con que se parezca.
         let ownTranslations = lines.prefix(NotebookContext.lineLimit).compactMap { line in
             if case .translated(let translation) = line.status {
                 LineDetector.normalize(translation.spanish)
             } else { nil }
         }
-        guard !ownTranslations.contains(english) else { return }
+        guard !ownTranslations.contains(where: {
+            LineDetector.similarity($0, english) >= LineDetector.similarityThreshold
+        }) else { return }
 
         notice = nil
         let id = UUID()
@@ -208,8 +216,11 @@ final class LiveSession {
         pending.removeFirst(batch.count)
         let english = batch.map { id in lines.first { $0.id == id }?.english ?? "" }
         inFlight = true
+        // Lo que se traduce ahora y lo que espera no son «líneas anteriores».
+        let notPrevious = Set(batch + pending)
         Task {
-            let context = await store.context(notebookID: setup.notebookID, sessionID: sessionID)
+            let context = await store.context(notebookID: setup.notebookID, sessionID: sessionID,
+                                              excluding: notPrevious)
             do {
                 let results = try await translator.translate(english, context: context)
                 for (id, result) in zip(batch, results) {
@@ -235,6 +246,7 @@ final class LiveSession {
     static func message(for error: any Error) -> String {
         switch error as? ExplainerError {
         case .missingAPIKey?: "Falta la clave de API"
+        case .server(status: 401, _)?: "La clave de API no es válida"
         case .rateLimited?: "Demasiadas peticiones; prueba en un momento"
         case .network?: "Sin conexión"
         default: "No se pudo traducir"

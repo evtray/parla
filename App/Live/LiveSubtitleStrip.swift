@@ -8,13 +8,17 @@ final class LiveOverlayPanel: NSPanel {
 
     let style: Style
 
-    init(style: Style, session: LiveSession) {
+    /// Con una ventana, el panel se queda en el escritorio del juego; solo el
+    /// recuadro de la pantalla lo sigue a todos.
+    init(style: Style, session: LiveSession, followsSpaces: Bool) {
         self.style = style
         super.init(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel],
                    backing: .buffered, defer: false)
         isFloatingPanel = true
         level = .statusBar
-        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
+        collectionBehavior = followsSpaces
+            ? [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
+            : [.fullScreenAuxiliary, .stationary, .ignoresCycle]
         ignoresMouseEvents = true
         isOpaque = false
         backgroundColor = .clear

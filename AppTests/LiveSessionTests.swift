@@ -64,6 +64,7 @@ private final class TextScript: @unchecked Sendable {
 /// hasta `open()`.
 private actor FakeLiveTranslator: LiveReadingTranslator {
     private(set) var calls: [[String]] = []
+    private(set) var contexts: [NotebookContext] = []
     private(set) var explained: [String] = []
     private var closed = false
     private var waiting: [CheckedContinuation<Void, Never>] = []
@@ -81,6 +82,7 @@ private actor FakeLiveTranslator: LiveReadingTranslator {
 
     func translate(_ lines: [String], context: NotebookContext) async throws -> [LiveTranslation?] {
         calls.append(lines)
+        contexts.append(context)
         if closed { await withCheckedContinuation { waiting.append($0) } }
         if let error = lines.compactMap({ failures[$0] }).first { throw error }
         return lines.map { LiveTranslation(spanish: "es: \($0)", save: false, expressions: []) }
@@ -281,4 +283,74 @@ private func feed(_ frames: FakeFrameSource, _ script: TextScript, _ count: Int)
     await until { frames.framesCalls == 1 }
     frames.send(.frame(pixel))
     await until { if case .paused(.readerFailed) = session.state { true } else { false } }
+}
+
+@MainActor @Test func elContextoNoRepiteLasLineasQueSeTraducen() async throws {
+    let frames = FakeFrameSource(), script = TextScript(twice(["A.", "B.", "C."]))
+    let translator = FakeLiveTranslator()
+    await translator.close()
+    let (session, _) = try makeSession(script: script, translator: translator, frames: frames)
+    session.start()
+    await feed(frames, script, 6)
+    await until { session.lines.count == 3 }
+    await translator.open()
+    await until { await translator.calls.count == 2 }
+    let contexts = await translator.contexts
+    #expect(contexts[0].recentLines == [])
+    #expect(contexts[1].recentLines == ["A."])
+}
+
+@MainActor @Test func elLectorSeRecuperaTrasUnFallo() async throws {
+    struct VisionFailed: Error {}
+    let frames = FakeFrameSource(), script = TextScript()
+    script.failure = VisionFailed()
+    let (session, _) = try makeSession(script: script, translator: FakeLiveTranslator(),
+                                       frames: frames)
+    session.start()
+    await until { frames.framesCalls == 1 }
+    frames.send(.frame(pixel))
+    await until { if case .paused(.readerFailed) = session.state { true } else { false } }
+    script.failure = nil
+    script.add(twice(["A."]))
+    await feed(frames, script, 2)
+    await until { session.state == .running }
+    await until { session.lines.count == 1 }
+}
+
+@MainActor @Test func noVuelveATraducirSuPropiaTraduccionAunqueVisionLaLeaDistinto() async throws {
+    let frames = FakeFrameSource(), script = TextScript(twice(["Hold the line until dawn."]))
+    let (session, _) = try makeSession(script: script, translator: FakeLiveTranslator(),
+                                       frames: frames)
+    session.start()
+    await feed(frames, script, 2)
+    await until { if case .translated = session.lines.first?.status { true } else { false } }
+    // «es: Hold the line until dawn.» leído por Vision sin el punto final.
+    script.add(twice(["es: Hold the line until dawn"]))
+    await feed(frames, script, 2)
+    #expect(session.lines.count == 1)
+}
+
+@MainActor @Test func unaClaveRechazadaLoDice() {
+    #expect(LiveSession.message(for: ExplainerError.server(status: 401, message: "invalid x-api-key"))
+            == "La clave de API no es válida")
+}
+
+@MainActor @Test func laTapaYElSubtituloSeEsconden() {
+    #expect(LiveReadingController.showsOverlay(state: .running, windowOnScreen: true))
+    #expect(!LiveReadingController.showsOverlay(state: .running, windowOnScreen: false))
+    #expect(!LiveReadingController.showsOverlay(state: .paused(.windowHidden), windowOnScreen: true))
+    #expect(!LiveReadingController.showsOverlay(state: .stopped, windowOnScreen: true))
+}
+
+@MainActor @Test func arrancarOtraVezTerminaLaSesionAnterior() {
+    let controller = LiveReadingController()
+    controller.apiKey = "sk-ant-prueba-no-valida"
+    let setup = LiveSetup(source: .screen, region: CGRect(x: 0, y: 0, width: 50, height: 20),
+                          notebookID: nil)
+    controller.start(setup)
+    let first = controller.session
+    controller.start(setup)
+    #expect(first?.state == .stopped)
+    #expect(controller.session !== first)
+    controller.stop()
 }

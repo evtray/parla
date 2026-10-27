@@ -110,6 +110,11 @@ final class RegionWatcher: FrameSource, @unchecked Sendable {
             let own = content.applications.filter {
                 $0.bundleIdentifier == Bundle.main.bundleIdentifier
             }
+            // Sin excluir a Parla, el recuadro puede leer su propia traducción;
+            // la sesión aún descarta lo que se parece a ella.
+            if own.isEmpty {
+                Log.pipeline.error("lectura en vivo: Parla no aparece entre las apps a excluir")
+            }
             let filter = SCContentFilter(display: display, excludingApplications: own,
                                          exceptingWindows: [])
             // `sourceRect` va en puntos de la pantalla, no globales.

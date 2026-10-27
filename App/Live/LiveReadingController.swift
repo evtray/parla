@@ -28,7 +28,8 @@ final class LiveReadingController {
     }
 
     @ObservationIgnored let notebooks = NotebookStore(modelContainer: Persistence.container)
-    @ObservationIgnored private var apiKey: String?
+    /// La de la sesión en marcha; `begin` la pone.
+    @ObservationIgnored var apiKey: String?
     @ObservationIgnored private var panel: FloatingPanel?
     @ObservationIgnored private var overlay: LiveOverlayPanel?
     @ObservationIgnored private var setupWindow: NSWindow?
@@ -82,6 +83,8 @@ final class LiveReadingController {
 
     func start(_ setup: LiveSetup) {
         guard let apiKey else { return }
+        // Un ⌃⌥L doble no deja una sesión huérfana leyendo sin panel.
+        if session != nil { stop() }
         closeSetupFlow()
         var memory = Preferences.shared.liveSetupMemory
         memory.remember(setup)
@@ -140,7 +143,8 @@ final class LiveReadingController {
             panel?.orderOut(nil)
             panel = nil
             let overlay = LiveOverlayPanel(style: display == .cover ? .cover : .strip,
-                                           session: session)
+                                           session: session,
+                                           followsSpaces: session.setup.source == .screen)
             self.overlay = overlay
             tracker = Task { [weak self] in
                 while !Task.isCancelled {
@@ -153,7 +157,9 @@ final class LiveReadingController {
 
     private func placeOverlay() async {
         guard let session, let overlay else { return }
-        guard let region = await Self.regionOnScreen(for: session.setup) else {
+        guard let (region, onScreen) = await Self.regionOnScreen(for: session.setup),
+              Self.showsOverlay(state: session.state, windowOnScreen: onScreen)
+        else {
             overlay.orderOut(nil)
             return
         }
@@ -161,25 +167,31 @@ final class LiveReadingController {
         overlay.orderFrontRegardless()
     }
 
-    /// Dónde está el recuadro ahora, en coordenadas de AppKit.
-    static func regionOnScreen(for setup: LiveSetup) async -> CGRect? {
+    /// Dónde está el recuadro ahora, en coordenadas de AppKit, y si su ventana
+    /// se ve (no minimizada ni en otro escritorio).
+    static func regionOnScreen(for setup: LiveSetup) async -> (CGRect, Bool)? {
         let primaryHeight = NSScreen.screens.first?.frame.height ?? 0
         switch setup.source {
         case .screen:
-            return ScreenCapturer.displaySpace(setup.region, primaryHeight: primaryHeight)
+            return (ScreenCapturer.displaySpace(setup.region, primaryHeight: primaryHeight), true)
         case .window:
-            let windows = (try? await WindowList.candidates()) ?? []
-            guard let window = LiveGeometry.pickWindow(for: setup.source, among: windows) else {
-                return nil
-            }
+            let windows = (try? await WindowList.shareableWindows()) ?? []
+            guard let window = RegionWatcher.pick(for: setup, among: windows) else { return nil }
             let frame = window.frame
             let region = CGRect(x: frame.minX + setup.region.minX * frame.width,
                                 y: frame.minY + setup.region.minY * frame.height,
                                 width: setup.region.width * frame.width,
                                 height: setup.region.height * frame.height)
             // La conversión entre los dos sistemas es su propia inversa.
-            return ScreenCapturer.displaySpace(region, primaryHeight: primaryHeight)
+            return (ScreenCapturer.displaySpace(region, primaryHeight: primaryHeight),
+                    window.isOnScreen)
         }
+    }
+
+    /// A y C tapan lo que haya debajo: solo mientras se lee y la ventana se ve.
+    /// Si el usuario cambia de app o de escritorio, no se quedan flotando.
+    static func showsOverlay(state: LiveSessionState, windowOnScreen: Bool) -> Bool {
+        state == .running && windowOnScreen
     }
 
     // MARK: - Flujo de configuración

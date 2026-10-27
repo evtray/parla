@@ -62,7 +62,9 @@ actor NotebookStore {
     }
 
     /// Con cuaderno, sus últimas 12 en cualquier sesión; sin él, las de la sesión.
-    func context(notebookID: UUID?, sessionID: UUID) -> NotebookContext {
+    /// `excluding`: las que se van a traducir ahora, que no son «anteriores».
+    func context(notebookID: UUID?, sessionID: UUID,
+                 excluding excluded: Set<UUID> = []) -> NotebookContext {
         var descriptor: FetchDescriptor<NotebookLine>
         if let notebookID {
             descriptor = FetchDescriptor(predicate: #Predicate { $0.notebook?.id == notebookID },
@@ -71,8 +73,10 @@ actor NotebookStore {
             descriptor = FetchDescriptor(predicate: #Predicate { $0.sessionID == sessionID },
                                          sortBy: [SortDescriptor(\.readAt, order: .reverse)])
         }
-        descriptor.fetchLimit = NotebookContext.lineLimit
-        let recent = (try? modelContext.fetch(descriptor)) ?? []
+        descriptor.fetchLimit = NotebookContext.lineLimit + excluded.count
+        let recent = ((try? modelContext.fetch(descriptor)) ?? [])
+            .filter { !excluded.contains($0.id) }
+            .prefix(NotebookContext.lineLimit)
         return NotebookContext(about: notebookID.flatMap(notebook)?.about ?? "",
                                recentLines: recent.reversed().map(\.english))
     }
