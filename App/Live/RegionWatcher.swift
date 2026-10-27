@@ -64,7 +64,10 @@ final class RegionWatcher: FrameSource, @unchecked Sendable {
     // MARK: - Stream
 
     func frames() -> AsyncStream<LiveFrameEvent> {
-        let (events, continuation) = AsyncStream<LiveFrameEvent>.makeStream()
+        // Si Vision va más lento que 2 fps, los fotogramas viejos sobran: solo
+        // importa el más reciente.
+        let (events, continuation) = AsyncStream<LiveFrameEvent>.makeStream(
+            bufferingPolicy: .bufferingNewest(3))
         let setup = setup
         let task = Task {
             let runner = StreamRunner(setup: setup, continuation: continuation)
