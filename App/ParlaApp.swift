@@ -18,6 +18,12 @@ struct ParlaApp: App {
         KeyboardShortcuts.onKeyUp(for: .toggleSubtitles) {
             Task { @MainActor in state.toggleSubtitles() }
         }
+        KeyboardShortcuts.onKeyUp(for: .toggleLiveReading) {
+            Task { @MainActor in state.toggleLiveReading() }
+        }
+        KeyboardShortcuts.onKeyUp(for: .readLiveNow) {
+            Task { @MainActor in state.readLiveNow() }
+        }
 
         // El primer momento en que se puede enseñar una ventana.
         _ = NotificationCenter.default.addObserver(
@@ -46,7 +52,7 @@ struct ParlaApp: App {
                 .modelContainer(Persistence.container)
         } label: {
             // Un solo símbolo: qué modo está activo se ve en el menú emergente.
-            Image(systemName: state.isListening || state.isSubtitling
+            Image(systemName: state.isListening || state.isSubtitling || state.liveSession != nil
                   ? "character.bubble.fill" : "character.bubble")
         }
         .menuBarExtraStyle(.window)

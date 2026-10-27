@@ -43,6 +43,13 @@ final class LiveSession {
     /// «No encontré texto en el recuadro» tras un «Leer ahora» vacío.
     private(set) var notice: String?
 
+    /// La traducción de la línea más nueva que ya la tiene, para A y C.
+    var latestSpanish: String? {
+        lines.lazy.compactMap { line -> String? in
+            if case .translated(let translation) = line.status { translation.spanish } else { nil }
+        }.first
+    }
+
     /// Al cambiarlo, arranca o para la lectura de fotogramas.
     var rhythm: LiveRhythm {
         didSet {

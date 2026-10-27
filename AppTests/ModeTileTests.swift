@@ -23,3 +23,11 @@ import ParlaCore
 @Test func sinAtajoLoDice() {
     #expect(ModeTileModel(mode: .voice, isActive: false, shortcut: nil).caption == "Sin atajo")
 }
+
+@Test func laCasillaDeLecturaEnVivoTieneNombreYSimbolo() {
+    let tile = ModeTileModel(mode: .live, isActive: false, shortcut: "⌃⌥L")
+    #expect(tile.title == "Lectura en vivo")
+    #expect(tile.symbol == "text.viewfinder")
+    #expect(tile.caption == "⌃⌥L")
+    #expect(ModeTileModel(mode: .live, isActive: true, shortcut: nil).caption == "Leyendo")
+}

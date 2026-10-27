@@ -655,6 +655,40 @@ final class AppState {
         }
     }
 
+    // MARK: - Lectura en vivo
+
+    /// La lectura en vivo tiene su propio panel y sus propias vistas.
+    let live = LiveReadingController()
+
+    var liveSession: LiveSession? { live.session }
+
+    /// ⌃⌥L: enciende (con lo recordado, o con el flujo) o termina.
+    func toggleLiveReading() {
+        if live.session != nil {
+            live.stop()
+            return
+        }
+        guard canStart(.live) else { return }
+        guard CGPreflightScreenCaptureAccess() else {
+            setup.screenRecordingWasDenied()
+            blockedMode = .live
+            showPanel()
+            return
+        }
+        guard let apiKey = KeychainStore.shared.apiKey else {
+            setupError = ExplainerError.missingAPIKey.readableMessage
+            showPanel()
+            return
+        }
+        Task { await live.begin(apiKey: apiKey) }
+    }
+
+    /// ⌃⌥R: lee el recuadro ya, también en «Cuando yo diga».
+    func readLiveNow() {
+        guard let session = live.session else { return }
+        Task { await session.readNow() }
+    }
+
     private func showPanel() {
         guard panel == nil else { return }
         let panel = FloatingPanel { PanelView(state: self) }

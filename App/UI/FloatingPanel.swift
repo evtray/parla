@@ -4,9 +4,10 @@ import SwiftUI
 /// Ventana que flota sobre cualquier app y no roba el foco.
 final class FloatingPanel: NSPanel {
 
-    private static let autosaveName = "ParlaFloatingPanel"
-
-    init<Content: View>(@ViewBuilder view: () -> Content) {
+    /// El panel de la lectura en vivo recuerda su sitio aparte del de las
+    /// capturas: pueden estar abiertos a la vez.
+    init<Content: View>(autosaveName: String = "ParlaFloatingPanel",
+                        @ViewBuilder view: () -> Content) {
         super.init(
             contentRect: NSRect(x: 0, y: 0, width: 420, height: 300),
             styleMask: [.nonactivatingPanel, .titled, .fullSizeContentView, .resizable],
@@ -29,8 +30,8 @@ final class FloatingPanel: NSPanel {
         contentView = NSHostingView(rootView: view())
 
         let hadSavedFrame = UserDefaults.standard
-            .string(forKey: "NSWindow Frame \(Self.autosaveName)") != nil
-        setFrameAutosaveName(Self.autosaveName)
+            .string(forKey: "NSWindow Frame \(autosaveName)") != nil
+        setFrameAutosaveName(autosaveName)
         if !hadSavedFrame { positionBottomRight() }
     }
 

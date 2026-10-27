@@ -12,6 +12,7 @@ struct ModeTileModel: Equatable {
         case .voice: "Voz"
         case .capture: "Captura"
         case .subtitles: "Subtítulos"
+        case .live: "Lectura en vivo"
         }
     }
 
@@ -20,12 +21,19 @@ struct ModeTileModel: Equatable {
         case .voice: isActive ? "mic.fill" : "mic"
         case .capture: "crop"
         case .subtitles: isActive ? "captions.bubble.fill" : "captions.bubble"
+        case .live: "text.viewfinder"
         }
     }
 
     /// Encendido, el estado; apagado, el atajo para encenderlo sin abrir esto.
     var caption: String {
-        if isActive { return mode == .voice ? "Escuchando" : "Activos" }
+        if isActive {
+            return switch mode {
+            case .voice: "Escuchando"
+            case .live: "Leyendo"
+            default: "Activos"
+            }
+        }
         return shortcut ?? "Sin atajo"
     }
 }
