@@ -25,6 +25,10 @@ public struct ClaudeRequestBuilder: Sendable {
         self.captureMaxTokens = captureMaxTokens
     }
 
+    /// Haiku no tiene fallback de servidor: rechaza tanto `fallbacks` como la
+    /// cabecera beta que lo activa.
+    public var supportsServerFallback: Bool { !model.hasPrefix("claude-haiku") }
+
     private static let endpoint = URL(string: "https://api.anthropic.com/v1/messages")!
 
     private static let modelsEndpoint = URL(string: "https://api.anthropic.com/v1/models?limit=1")!
@@ -138,12 +142,10 @@ public struct ClaudeRequestBuilder: Sendable {
                          content: Any,
                          schema: [String: Any],
                          maxTokens: Int) -> [String: Any] {
-        [
+        var payload: [String: Any] = [
             "model": model,
             "max_tokens": maxTokens,
             "stream": true,
-            // Si un clasificador declina la frase, la API reintenta sola.
-            "fallbacks": "default",
             "output_config": [
                 "effort": "low",
                 "format": ["type": "json_schema", "schema": schema],
@@ -155,6 +157,9 @@ public struct ClaudeRequestBuilder: Sendable {
             ]],
             "messages": [["role": "user", "content": content]],
         ]
+        // Si un clasificador declina la frase, la API reintenta sola.
+        if supportsServerFallback { payload["fallbacks"] = "default" }
+        return payload
     }
 
     private func request(_ payload: [String: Any], apiKey: String) throws -> URLRequest {
@@ -165,7 +170,9 @@ public struct ClaudeRequestBuilder: Sendable {
         request.setValue("application/json", forHTTPHeaderField: "content-type")
         request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
         request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
-        request.setValue("server-side-fallback-2026-07-01", forHTTPHeaderField: "anthropic-beta")
+        if supportsServerFallback {
+            request.setValue("server-side-fallback-2026-07-01", forHTTPHeaderField: "anthropic-beta")
+        }
         // Claves ordenadas: un diccionario de Swift no garantiza el orden, y el
         // esquema de salida entra en el prefijo cacheado. Con el orden al azar,
         // cada petición estrenaba caché y pagaba el system prompt entero.

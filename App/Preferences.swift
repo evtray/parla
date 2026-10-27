@@ -13,6 +13,7 @@ struct Preferences: @unchecked Sendable {
     private enum Key {
         static let translationMode = "translationMode"
         static let model = "model"
+        static let liveModel = "liveModel"
         static let inputDeviceUID = "inputDeviceUID"
         static let readsSubtitlesAloud = "readsSubtitlesAloud"
         static let hasSeenWelcome = "hasSeenWelcome"
@@ -35,6 +36,16 @@ struct Preferences: @unchecked Sendable {
                 .flatMap(ClaudeModel.init(rawValue:)) ?? .default
         }
         nonmutating set { defaults.set(newValue.rawValue, forKey: Key.model) }
+    }
+
+    /// La lectura en vivo traduce muchas líneas cortas: por defecto, el modelo
+    /// más barato, aparte del de las capturas y la voz.
+    var liveModel: ClaudeModel {
+        get {
+            defaults.string(forKey: Key.liveModel)
+                .flatMap(ClaudeModel.init(rawValue:)) ?? .haiku55
+        }
+        nonmutating set { defaults.set(newValue.rawValue, forKey: Key.liveModel) }
     }
 
     /// `nil` es "el micrófono del sistema".

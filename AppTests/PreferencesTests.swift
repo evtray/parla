@@ -97,3 +97,23 @@ private func withScratchDefaults(_ body: (UserDefaults) throws -> Void) rethrows
         #expect(Preferences(defaults: defaults).screenRecordingRequested)
     }
 }
+
+@Test func laLecturaEnVivoEmpiezaConHaiku() {
+    withScratchDefaults { defaults in
+        #expect(Preferences(defaults: defaults).liveModel == .haiku55)
+    }
+}
+
+@Test func elModeloDeLaLecturaEnVivoSobreviveAReabrirLaApp() {
+    withScratchDefaults { defaults in
+        Preferences(defaults: defaults).liveModel = .sonnet55
+        #expect(Preferences(defaults: defaults).liveModel == .sonnet55)
+    }
+}
+
+@Test func cambiarElModeloDeLaLecturaNoCambiaElDeLasCapturas() {
+    withScratchDefaults { defaults in
+        Preferences(defaults: defaults).liveModel = .fable51
+        #expect(Preferences(defaults: defaults).model == .opus55)
+    }
+}
