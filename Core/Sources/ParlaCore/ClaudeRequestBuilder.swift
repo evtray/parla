@@ -133,6 +133,41 @@ public struct ClaudeRequestBuilder: Sendable {
         ]
     }
 
+    /// El esquema de la lectura en vivo. Coincide con `LiveReadingResponse`.
+    private static var liveReadingSchema: [String: Any] {
+        [
+            "type": "object",
+            "properties": [
+                "lines": [
+                    "type": "array",
+                    "items": [
+                        "type": "object",
+                        "properties": [
+                            "spanish": ["type": "string"],
+                            "save": ["type": "boolean"],
+                            "expressions": [
+                                "type": "array",
+                                "items": [
+                                    "type": "object",
+                                    "properties": [
+                                        "phrase": ["type": "string"],
+                                        "meaning": ["type": "string"],
+                                    ],
+                                    "required": ["phrase", "meaning"],
+                                    "additionalProperties": false,
+                                ],
+                            ],
+                        ],
+                        "required": ["spanish", "save", "expressions"],
+                        "additionalProperties": false,
+                    ],
+                ],
+            ],
+            "required": ["lines"],
+            "additionalProperties": false,
+        ]
+    }
+
     // MARK: - Peticiones
 
     /// El cuerpo común. Los dos modos comparten el bloque `system` byte a byte:
@@ -238,6 +273,37 @@ public struct ClaudeRequestBuilder: Sendable {
                                    content: content,
                                    schema: captureSchema,
                                    maxTokens: captureMaxTokens),
+                           apiKey: apiKey)
+    }
+
+    // MARK: - Lectura en vivo
+
+    /// El contexto va antes que las líneas nuevas; vacío, no deja hueco.
+    private static func liveContent(_ context: NotebookContext, newLines: [String]) -> String {
+        let context = context.promptText
+        let lines = "Líneas nuevas:\n" + NotebookContext.numbered(newLines)
+        return context.isEmpty ? lines : context + "\n\n" + lines
+    }
+
+    public func makeLiveReadingRequest(lines: [String], context: NotebookContext,
+                                       apiKey: String) throws -> URLRequest {
+        try request(payload(system: LiveReadingSystemPrompt.text,
+                            content: Self.liveContent(context, newLines: lines),
+                            schema: Self.liveReadingSchema,
+                            maxTokens: maxTokens),
+                    apiKey: apiKey)
+    }
+
+    /// «Guardar» una línea que el modelo no marcó: mismo system prompt y
+    /// esquema, para compartir caché, y la orden de explicarla siempre.
+    public func makeExplainLineRequest(line: String, context: NotebookContext,
+                                       apiKey: String) throws -> URLRequest {
+        let content = Self.liveContent(context, newLines: [line])
+            + "\n\nExplica siempre esta línea: save en true y al menos una expresión."
+        return try request(payload(system: LiveReadingSystemPrompt.text,
+                                   content: content,
+                                   schema: Self.liveReadingSchema,
+                                   maxTokens: maxTokens),
                            apiKey: apiKey)
     }
 }
