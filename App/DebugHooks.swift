@@ -97,10 +97,13 @@ enum DebugHooks {
                         + "en pantalla=\(window.isOnScreen)")
                 }
                 try await Task.sleep(for: .seconds(8))
+                // La misma lista y la misma elección que la lectura en vivo: el
+                // juego también tiene franjas de 30 px de alto que no se pintan.
+                let windows = try await WindowList.shareableWindows()
                 guard let bundleID,
-                      let window = content.windows.first(where: {
-                          $0.owningApplication?.bundleIdentifier == bundleID && $0.frame.width >= 100
-                      })
+                      let window = windows
+                          .filter({ $0.owningApplication?.bundleIdentifier == bundleID })
+                          .max(by: { $0.frame.width * $0.frame.height < $1.frame.width * $1.frame.height })
                 else {
                     Log.audio.error("sonda 2: no hay ventana de «\(bundleID ?? "nil")»")
                     return
