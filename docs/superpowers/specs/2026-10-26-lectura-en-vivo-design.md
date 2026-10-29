@@ -370,6 +370,19 @@ antemano:
    concedido debe listar las ventanas de otras apps con su `bundleID`. Si no
    da el `bundleID`, se recuerda la app por su nombre.
 
+**Resultados (29-oct-2026, AFK Journey en una Mac con macOS 26.5):**
+
+- **Sonda 2: pasa.** El stream entrega 2 fotogramas completos por segundo,
+  durante 20 s, con la ventana visible, medio tapada y a pantalla completa
+  en otro Escritorio. No hace falta el aviso de pantalla completa.
+- **Sonda 3: pasa.** El panel se ve encima del juego en ventana y a
+  pantalla completa. No hace falta cambiar a A.
+- **Sonda 5: pasa.** Todas las ventanas traen su `bundleID`; el juego es
+  `com.farlightgames.igame.ios`. Además de la ventana principal, el juego
+  tiene franjas de 30 px de alto que no se pintan: hay que elegir la ventana
+  como `WindowList`, sin las de menos de 100 px de alto.
+- **Sondas 1 y 4:** pendientes.
+
 ## 11. Decisiones registradas
 
 - **Leer el texto en la Mac, no mandar imágenes:** cuesta casi nada, responde
