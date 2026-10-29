@@ -381,7 +381,14 @@ antemano:
   `com.farlightgames.igame.ios`. Además de la ventana principal, el juego
   tiene franjas de 30 px de alto que no se pintan: hay que elegir la ventana
   como `WindowList`, sin las de menos de 100 px de alto.
-- **Sondas 1 y 4:** pendientes.
+- **Sonda 1: pasa en palabras.** Siete capturas limpias de diálogos (de 14:
+  las demás eran menús o las tapaba un aviso del sistema). Vision leyó bien
+  todas las palabras, incluidos nombres como «Guard Damon» y «Northville»,
+  en 160–310 ms. Solo 3 de 7 salen exactas: se pierde el punto final gris
+  claro (2), unos «...» finales (1) y lee como «• • •» la línea punteada bajo
+  el nombre (1). Nada de eso cambia la traducción, así que no se activan las
+  alternativas.
+- **Sonda 4:** pendiente.
 
 ## 11. Decisiones registradas
 
