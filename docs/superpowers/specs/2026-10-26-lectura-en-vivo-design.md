@@ -388,7 +388,12 @@ antemano:
   claro (2), unos «...» finales (1) y lee como «• • •» la línea punteada bajo
   el nombre (1). Nada de eso cambia la traducción, así que no se activan las
   alternativas.
-- **Sonda 4:** pendiente.
+- **Sonda 4: pasa.** Con Haiku 5.5, las 5 líneas de una petición vuelven
+  completas y en orden; la cola sigue mandando hasta 5. En la misma
+  evaluación, 7 de 11 líneas aciertan en traducción y en si guardar: dos
+  frases hechas no se guardan («doesn't add up», «plays tricks on you»), una
+  se guarda de más («hold it») y una explicación dice «alerta» donde se
+  esperaba «atento». Las traducciones son todas correctas.
 
 ## 11. Decisiones registradas
 
