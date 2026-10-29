@@ -6,7 +6,8 @@ import SwiftUI
 struct NotebookDetailView: View {
     let entry: NotebookListEntry
     let store: NotebookStore
-    let onDelete: () -> Void
+    /// Vuelve a la lista: al pulsar «Cuadernos» y al borrar el cuaderno.
+    let onClose: () -> Void
 
     @Query private var notebooks: [Notebook]
     @State private var name = ""
@@ -20,6 +21,10 @@ struct NotebookDetailView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+            // La pila vive dentro de la columna de detalle, así que macOS no pone
+            // la flecha de regreso en la barra: el botón va aquí.
+            Button(action: onClose) { Label("Cuadernos", systemImage: "chevron.left") }
+                .buttonStyle(.link)
             if let notebookID {
                 TextField("Nombre", text: $name)
                     .font(.title2.weight(.semibold))
@@ -52,7 +57,7 @@ struct NotebookDetailView: View {
             Button("Borrar", role: .destructive) {
                 guard let notebookID else { return }
                 Task { await store.deleteNotebook(notebookID) }
-                onDelete()
+                onClose()
             }
         }
     }
