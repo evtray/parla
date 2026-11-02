@@ -102,3 +102,18 @@ private let utterance = Utterance(text: "necesito que me avises cuando llegues",
     #expect(request.timeoutInterval == 10)
     #expect(request.httpBody == nil)
 }
+
+@Test func conHaikuNoPideFallbackNiCabeceraBeta() throws {
+    let request = try ClaudeRequestBuilder(model: "claude-haiku-5-5")
+        .makeRequest(for: utterance, apiKey: "k")
+    #expect(request.value(forHTTPHeaderField: "anthropic-beta") == nil)
+    #expect(try body(of: request)["fallbacks"] == nil)
+}
+
+@Test func conLosDemasModelosSiguePidiendoFallback() throws {
+    for model in ["claude-opus-5-5", "claude-sonnet-5-5"] {
+        let request = try ClaudeRequestBuilder(model: model).makeRequest(for: utterance, apiKey: "k")
+        #expect(request.value(forHTTPHeaderField: "anthropic-beta") == "server-side-fallback-2026-07-01")
+        #expect(try body(of: request)["fallbacks"] as? String == "default")
+    }
+}

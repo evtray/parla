@@ -85,3 +85,9 @@ private func inputs(hasAPIKey: Bool = true,
     #expect(status.startBlockers(for: .voice).map(\.item) == [.microphone])
     #expect(status.startBlockers(for: .capture).map(\.item) == [.screenRecording])
 }
+
+@Test func laLecturaEnVivoNecesitaClaveYGrabacionDePantalla() {
+    let status = SetupStatus(inputs(hasAPIKey: false, microphone: .denied, screen: false,
+                                    languages: .needsDownload))
+    #expect(status.blockers(for: .live).map(\.item) == [.apiKey, .screenRecording])
+}

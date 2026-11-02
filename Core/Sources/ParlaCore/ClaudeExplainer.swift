@@ -176,3 +176,33 @@ extension ClaudeExplainer: CaptureExplainer {
         return card
     }
 }
+
+// MARK: - Lectura en vivo
+
+extension ClaudeExplainer: LiveReadingTranslator {
+    public func translate(_ lines: [String],
+                          context: NotebookContext) async throws -> [LiveTranslation?] {
+        guard !lines.isEmpty else { return [] }
+        let request = try builder.makeLiveReadingRequest(lines: lines, context: context,
+                                                         apiKey: apiKey)
+        let translations = try await liveTranslations(request).map(\.cleaned)
+        // Lo que falta queda sin traducir y lo que sobra no es de nadie: cada
+        // línea se empareja por posición.
+        return (0..<lines.count).map { translations.indices.contains($0) ? translations[$0] : nil }
+    }
+
+    public func explain(_ line: String, context: NotebookContext) async throws -> LiveTranslation? {
+        let request = try builder.makeExplainLineRequest(line: line, context: context,
+                                                         apiKey: apiKey)
+        return try await liveTranslations(request).first?.cleaned
+    }
+
+    /// Una respuesta cortada por `max_tokens` no es JSON válido: malformada.
+    private func liveTranslations(_ request: URLRequest) async throws -> [LiveTranslation] {
+        let json = try await streamJSON(request)
+        guard let data = json.data(using: .utf8),
+              let response = try? JSONDecoder().decode(LiveReadingResponse.self, from: data)
+        else { throw ExplainerError.malformedResponse }
+        return response.lines
+    }
+}

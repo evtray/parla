@@ -1,8 +1,8 @@
 import Foundation
 
-/// Los tres modos de Parla, para preguntar qué necesita cada uno.
+/// Los modos de Parla, para preguntar qué necesita cada uno.
 public enum ParlaMode: Sendable, CaseIterable, Hashable {
-    case voice, capture, subtitles
+    case voice, capture, subtitles, live
 }
 
 public enum PermissionState: Sendable, Equatable {
@@ -42,9 +42,9 @@ public enum SetupItem: Sendable, CaseIterable, Hashable {
     /// Los modos que no funcionan sin esto.
     var modes: Set<ParlaMode> {
         switch self {
-        case .apiKey:          [.voice, .capture]
+        case .apiKey:          [.voice, .capture, .live]
         case .microphone:      [.voice]
-        case .screenRecording: [.capture, .subtitles]
+        case .screenRecording: [.capture, .subtitles, .live]
         case .languages:       [.subtitles]
         }
     }

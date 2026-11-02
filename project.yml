@@ -1,6 +1,14 @@
 name: Parla
 options:
   bundleIdPrefix: app.schoolaid
+
+# Firma con un certificado fijo: con la firma ad hoc cada compilación cambia la
+# huella y macOS olvida los permisos (micrófono, Grabación de pantalla).
+settings:
+  base:
+    CODE_SIGN_STYLE: Manual
+    CODE_SIGN_IDENTITY: "Apple Development"
+    DEVELOPMENT_TEAM: N39D5U3KH7
   deploymentTarget:
     macOS: "26.4"
   createIntermediateGroups: true

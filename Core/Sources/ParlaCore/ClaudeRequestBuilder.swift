@@ -25,6 +25,10 @@ public struct ClaudeRequestBuilder: Sendable {
         self.captureMaxTokens = captureMaxTokens
     }
 
+    /// Haiku no tiene fallback de servidor: rechaza tanto `fallbacks` como la
+    /// cabecera beta que lo activa.
+    public var supportsServerFallback: Bool { !model.hasPrefix("claude-haiku") }
+
     private static let endpoint = URL(string: "https://api.anthropic.com/v1/messages")!
 
     private static let modelsEndpoint = URL(string: "https://api.anthropic.com/v1/models?limit=1")!
@@ -129,6 +133,41 @@ public struct ClaudeRequestBuilder: Sendable {
         ]
     }
 
+    /// El esquema de la lectura en vivo. Coincide con `LiveReadingResponse`.
+    private static var liveReadingSchema: [String: Any] {
+        [
+            "type": "object",
+            "properties": [
+                "lines": [
+                    "type": "array",
+                    "items": [
+                        "type": "object",
+                        "properties": [
+                            "spanish": ["type": "string"],
+                            "save": ["type": "boolean"],
+                            "expressions": [
+                                "type": "array",
+                                "items": [
+                                    "type": "object",
+                                    "properties": [
+                                        "phrase": ["type": "string"],
+                                        "meaning": ["type": "string"],
+                                    ],
+                                    "required": ["phrase", "meaning"],
+                                    "additionalProperties": false,
+                                ],
+                            ],
+                        ],
+                        "required": ["spanish", "save", "expressions"],
+                        "additionalProperties": false,
+                    ],
+                ],
+            ],
+            "required": ["lines"],
+            "additionalProperties": false,
+        ]
+    }
+
     // MARK: - Peticiones
 
     /// El cuerpo común. Los dos modos comparten el bloque `system` byte a byte:
@@ -138,12 +177,10 @@ public struct ClaudeRequestBuilder: Sendable {
                          content: Any,
                          schema: [String: Any],
                          maxTokens: Int) -> [String: Any] {
-        [
+        var payload: [String: Any] = [
             "model": model,
             "max_tokens": maxTokens,
             "stream": true,
-            // Si un clasificador declina la frase, la API reintenta sola.
-            "fallbacks": "default",
             "output_config": [
                 "effort": "low",
                 "format": ["type": "json_schema", "schema": schema],
@@ -155,6 +192,9 @@ public struct ClaudeRequestBuilder: Sendable {
             ]],
             "messages": [["role": "user", "content": content]],
         ]
+        // Si un clasificador declina la frase, la API reintenta sola.
+        if supportsServerFallback { payload["fallbacks"] = "default" }
+        return payload
     }
 
     private func request(_ payload: [String: Any], apiKey: String) throws -> URLRequest {
@@ -165,7 +205,9 @@ public struct ClaudeRequestBuilder: Sendable {
         request.setValue("application/json", forHTTPHeaderField: "content-type")
         request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
         request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
-        request.setValue("server-side-fallback-2026-07-01", forHTTPHeaderField: "anthropic-beta")
+        if supportsServerFallback {
+            request.setValue("server-side-fallback-2026-07-01", forHTTPHeaderField: "anthropic-beta")
+        }
         // Claves ordenadas: un diccionario de Swift no garantiza el orden, y el
         // esquema de salida entra en el prefijo cacheado. Con el orden al azar,
         // cada petición estrenaba caché y pagaba el system prompt entero.
@@ -231,6 +273,37 @@ public struct ClaudeRequestBuilder: Sendable {
                                    content: content,
                                    schema: captureSchema,
                                    maxTokens: captureMaxTokens),
+                           apiKey: apiKey)
+    }
+
+    // MARK: - Lectura en vivo
+
+    /// El contexto va antes que las líneas nuevas; vacío, no deja hueco.
+    private static func liveContent(_ context: NotebookContext, newLines: [String]) -> String {
+        let context = context.promptText
+        let lines = "Líneas nuevas:\n" + NotebookContext.numbered(newLines)
+        return context.isEmpty ? lines : context + "\n\n" + lines
+    }
+
+    public func makeLiveReadingRequest(lines: [String], context: NotebookContext,
+                                       apiKey: String) throws -> URLRequest {
+        try request(payload(system: LiveReadingSystemPrompt.text,
+                            content: Self.liveContent(context, newLines: lines),
+                            schema: Self.liveReadingSchema,
+                            maxTokens: maxTokens),
+                    apiKey: apiKey)
+    }
+
+    /// «Guardar» una línea que el modelo no marcó: mismo system prompt y
+    /// esquema, para compartir caché, y la orden de explicarla siempre.
+    public func makeExplainLineRequest(line: String, context: NotebookContext,
+                                       apiKey: String) throws -> URLRequest {
+        let content = Self.liveContent(context, newLines: [line])
+            + "\n\nExplica siempre esta línea: save en true y al menos una expresión."
+        return try request(payload(system: LiveReadingSystemPrompt.text,
+                                   content: content,
+                                   schema: Self.liveReadingSchema,
+                                   maxTokens: maxTokens),
                            apiKey: apiKey)
     }
 }

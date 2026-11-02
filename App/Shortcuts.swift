@@ -8,6 +8,10 @@ extension KeyboardShortcuts.Name {
                                     initial: .init(.c, modifiers: [.control, .option]))
     static let toggleSubtitles = Self("toggleSubtitles",
                                       initial: .init(.s, modifiers: [.control, .option]))
+    static let toggleLiveReading = Self("toggleLiveReading",
+                                        initial: .init(.l, modifiers: [.control, .option]))
+    static let readLiveNow = Self("readLiveNow",
+                                  initial: .init(.r, modifiers: [.control, .option]))
 }
 
 extension ParlaMode {
@@ -17,6 +21,7 @@ extension ParlaMode {
         case .voice: .toggleListening
         case .capture: .captureScreen
         case .subtitles: .toggleSubtitles
+        case .live: .toggleLiveReading
         }
     }
 }

@@ -23,11 +23,21 @@ struct MenuBarPopover: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
-                ModeTile(model: tile(.voice)) { toggle(.voice) }
-                ModeTile(model: tile(.capture)) { capture() }
-                ModeTile(model: tile(.subtitles)) { toggle(.subtitles) }
+            Grid(horizontalSpacing: 8, verticalSpacing: 8) {
+                GridRow {
+                    ModeTile(model: tile(.voice)) { toggle(.voice) }
+                    ModeTile(model: tile(.capture)) { capture() }
+                }
+                GridRow {
+                    ModeTile(model: tile(.subtitles)) { toggle(.subtitles) }
+                    ModeTile(model: tile(.live)) { live() }
+                }
             }
+
+            Button("Elegir otro recuadro…") { chooseLiveRegion() }
+                .buttonStyle(.link)
+                .font(.caption)
+                .frame(maxWidth: .infinity, alignment: .trailing)
 
             if !notices.visible.isEmpty {
                 VStack(alignment: .leading, spacing: 10) {
@@ -91,6 +101,7 @@ struct MenuBarPopover: View {
         let isActive = switch mode {
         case .voice: state.isListening
         case .subtitles: state.isSubtitling
+        case .live: state.liveSession != nil
         case .capture: false
         }
         return ModeTileModel(mode: mode, isActive: isActive,
@@ -114,6 +125,25 @@ struct MenuBarPopover: View {
         guard !state.isBlocked(.capture) else { return }
         dismiss()
         state.captureScreen()
+    }
+
+    /// Apagada, la enciende; encendida, abre su panel: en las vistas A y C es
+    /// la forma de llegar a él. Se termina desde el panel o con ⌃⌥L.
+    private func live() {
+        dismiss()
+        if state.liveSession != nil {
+            state.live.showPanel()
+        } else {
+            guard !state.isBlocked(.live) else { return }
+            state.toggleLiveReading()
+        }
+    }
+
+    /// Como la casilla apagada, pero sin arrancar con lo recordado.
+    private func chooseLiveRegion() {
+        guard !state.isBlocked(.live) else { return }
+        dismiss()
+        state.chooseLiveRegion()
     }
 
     private func open(_ section: StudioSection?) {

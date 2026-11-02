@@ -1,5 +1,6 @@
 import CoreAudio
 import SwiftUI
+import ParlaCore
 import KeyboardShortcuts
 
 struct SettingsSection: View {
@@ -55,6 +56,23 @@ struct SettingsSection: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            Section("Lectura en vivo") {
+                Picker("Modelo para la lectura en vivo", selection: Bindable(state.live).model) {
+                    ForEach(ClaudeModel.allCases) { model in
+                        Text(model.label).tag(model)
+                    }
+                }
+                Text(state.live.model.detail)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Picker("Ver la traducción", selection: Bindable(state.live).display) {
+                    ForEach(LiveDisplay.allCases, id: \.self) { display in
+                        Text(display.label).tag(display)
+                    }
+                }
+                .pickerStyle(.radioGroup)
+            }
             Section("Cuándo traducir") {
                 Picker("", selection: $state.mode) {
                     ForEach(TranslationMode.allCases) { mode in
@@ -106,6 +124,8 @@ struct SettingsSection: View {
                                           name: .toggleListening)
                 KeyboardShortcuts.Recorder("Capturar pantalla:", name: .captureScreen)
                 KeyboardShortcuts.Recorder("Mostrar u ocultar subtítulos:", name: .toggleSubtitles)
+                KeyboardShortcuts.Recorder("Lectura en vivo:", name: .toggleLiveReading)
+                KeyboardShortcuts.Recorder("Leer ahora:", name: .readLiveNow)
             }
             Section("Bienvenida") {
                 Button("Ver la bienvenida otra vez") { state.windows.showWelcome() }

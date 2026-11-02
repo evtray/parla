@@ -1,4 +1,5 @@
 import Foundation
+import ParlaCore
 
 /// Lo que se elige en Ajustes y sobrevive a cerrar la app.
 ///
@@ -13,6 +14,10 @@ struct Preferences: @unchecked Sendable {
     private enum Key {
         static let translationMode = "translationMode"
         static let model = "model"
+        static let liveModel = "liveModel"
+        static let liveSetupMemory = "liveSetupMemory"
+        static let liveRhythm = "liveRhythm"
+        static let liveDisplay = "liveDisplay"
         static let inputDeviceUID = "inputDeviceUID"
         static let readsSubtitlesAloud = "readsSubtitlesAloud"
         static let hasSeenWelcome = "hasSeenWelcome"
@@ -35,6 +40,46 @@ struct Preferences: @unchecked Sendable {
                 .flatMap(ClaudeModel.init(rawValue:)) ?? .default
         }
         nonmutating set { defaults.set(newValue.rawValue, forKey: Key.model) }
+    }
+
+    /// La lectura en vivo traduce muchas líneas cortas: por defecto, el modelo
+    /// más barato, aparte del de las capturas y la voz.
+    var liveModel: ClaudeModel {
+        get {
+            defaults.string(forKey: Key.liveModel)
+                .flatMap(ClaudeModel.init(rawValue:)) ?? .haiku55
+        }
+        nonmutating set { defaults.set(newValue.rawValue, forKey: Key.liveModel) }
+    }
+
+    /// Lo último que se configuró en la lectura en vivo, en JSON. Uno ilegible
+    /// (de otra versión) se olvida: la próxima vez se pregunta de nuevo.
+    var liveSetupMemory: LiveSetupMemory {
+        get {
+            defaults.data(forKey: Key.liveSetupMemory)
+                .flatMap { try? JSONDecoder().decode(LiveSetupMemory.self, from: $0) }
+                ?? LiveSetupMemory()
+        }
+        nonmutating set {
+            defaults.set(try? JSONEncoder().encode(newValue), forKey: Key.liveSetupMemory)
+        }
+    }
+
+    var liveRhythm: LiveRhythm {
+        get {
+            defaults.string(forKey: Key.liveRhythm)
+                .flatMap(LiveRhythm.init(rawValue:)) ?? .automatic
+        }
+        nonmutating set { defaults.set(newValue.rawValue, forKey: Key.liveRhythm) }
+    }
+
+    /// El panel (B) es lo que menos estorba la primera vez.
+    var liveDisplay: LiveDisplay {
+        get {
+            defaults.string(forKey: Key.liveDisplay)
+                .flatMap(LiveDisplay.init(rawValue:)) ?? .panel
+        }
+        nonmutating set { defaults.set(newValue.rawValue, forKey: Key.liveDisplay) }
     }
 
     /// `nil` es "el micrófono del sistema".

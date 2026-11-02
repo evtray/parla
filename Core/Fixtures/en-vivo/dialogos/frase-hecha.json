@@ -1,0 +1,4 @@
+{ "about": "RPG de fantasía; Maren desconfía de un mercader.",
+  "history": ["He says he can get us past the gate for free."],
+  "lines": [ { "english": "Something about him doesn't add up.",
+               "expectSave": true, "mustMention": ["cuadra", "encaja", "raro", "sentido"] } ] }

@@ -1,0 +1,4 @@
+{ "about": "RPG de fantasía; Maren es la capitana de la guardia; el Gloomwood es un bosque maldito.",
+  "history": ["The Gloomwood stirs again. We have to hold the line until dawn."],
+  "lines": [ { "english": "Then we hold it together. Nobody falls back.",
+               "expectSave": false, "mustMention": ["línea", "aguant", "resist", "manten", "manteng"] } ] }
