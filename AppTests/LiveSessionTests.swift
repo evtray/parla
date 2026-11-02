@@ -159,6 +159,22 @@ private func feed(_ frames: FakeFrameSource, _ script: TextScript, _ count: Int)
     #expect(await translator.calls == [["A."], ["B.", "C."]])
 }
 
+@MainActor @Test func terminarNoMandaLasLineasQueEsperaban() async throws {
+    let frames = FakeFrameSource(), script = TextScript(twice(["A.", "B.", "C."]))
+    let translator = FakeLiveTranslator()
+    await translator.close()
+    let (session, _) = try makeSession(script: script, translator: translator, frames: frames)
+    session.start()
+    await feed(frames, script, 6)
+    await until { session.lines.count == 3 }
+    session.stop()
+    await translator.open()
+    await until { session.lines.contains { if case .translated = $0.status { true } else { false } } }
+    // La siguiente tanda saldría justo después de la respuesta de A.
+    try await Task.sleep(for: .milliseconds(200))
+    #expect(await translator.calls == [["A."]])
+}
+
 @MainActor @Test func masDeCincoPendientesVanEnTandasDeCinco() async throws {
     let texts = (1...8).map { "Line \($0)." }
     let frames = FakeFrameSource(), script = TextScript(twice(texts))

@@ -85,8 +85,11 @@ final class LiveSession {
         if rhythm == .automatic { startWatching() }
     }
 
+    /// Lo que esperaba en la cola ya no se manda: terminar no debe seguir
+    /// gastando. La petición en vuelo sí se completa, porque ya se pagó.
     func stop() {
         stopWatching()
+        pending.removeAll()
         state = .stopped
     }
 
@@ -211,7 +214,7 @@ final class LiveSession {
     }
 
     private func pump() {
-        guard !inFlight, !pending.isEmpty else { return }
+        guard !inFlight, !pending.isEmpty, state != .stopped else { return }
         let batch = Array(pending.prefix(Self.maxBatch))
         pending.removeFirst(batch.count)
         let english = batch.map { id in lines.first { $0.id == id }?.english ?? "" }
